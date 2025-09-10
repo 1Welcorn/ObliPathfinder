@@ -20,6 +20,6 @@
     "vite": "^6.2.0"
   },
   "resolutions": {
-  "rollup": "npm:@rollup/wasm-node"
+  "rollup": "npm:@rollup/wasm-node?4.50.1"
 }
 }
