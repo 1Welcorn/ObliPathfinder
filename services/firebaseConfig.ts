@@ -8,11 +8,11 @@ import { getFirestore } from "firebase/firestore";
 const firebaseConfig = {
   apiKey: process.env.FIREBASE_API_KEY,
   authDomain: process.env.FIREBASE_AUTH_DOMAIN,
-  projectId: "obli-fluency-pathfinder",
-  storageBucket: "obli-fluency-pathfinder.firebasestorage.app",
-  messagingSenderId: "361914234340",
-  appId: "1:361914234340:web:12a2f9d022d5bf0e4103f1",
-  measurementId: "G-NTJ1CXRKKH"
+  // projectId: "obli-fluency-pathfinder",
+  // storageBucket: "obli-fluency-pathfinder.firebasestorage.app",
+  // messagingSenderId: "361914234340",
+  // appId: "1:361914234340:web:12a2f9d022d5bf0e4103f1",
+  // measurementId: "G-NTJ1CXRKKH"
 };
 
 // Initialize Firebase
