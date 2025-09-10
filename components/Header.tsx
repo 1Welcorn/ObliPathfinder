@@ -23,7 +23,6 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, isPortugueseHelpVisible
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center justify-between h-16">
                     <div className="flex items-center gap-3">
-                        <img src="https://www.canva.com/design/DAGyheH7U1I/F21Lv38TjFUZmEOKlGWsnQ/view?utm_content=DAGyheH7U1I&utm_campaign=designshare&utm_medium=link2&utm_source=uniquelinks&utlId=h7e84ba11a" alt="OBLI Pathfinder Logo" className="h-10 w-10" />
                         <span className="text-xl font-bold text-slate-800 hidden sm:block">OBLI Pathfinder</span>
                          {user && (
                             <>
