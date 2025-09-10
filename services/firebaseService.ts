@@ -1,180 +1,137 @@
-// NOTE: This is a simplified mock of the Firebase SDK for demonstration purposes.
-// In a real application, you would import these from the 'firebase' packages.
-// The logic here simulates the behavior of Firebase Authentication and Firestore.
+import {
+    onAuthStateChanged as firebaseOnAuthStateChanged,
+    signInWithPopup,
+    GoogleAuthProvider,
+    signOut,
+    type User as FirebaseUser
+} from 'firebase/auth';
+import { doc, getDoc, setDoc, updateDoc, serverTimestamp, collection, query, where, getDocs } from 'firebase/firestore';
+import { auth, db } from './firebaseConfig';
+import type { User, UserRole, LearningPlan, Lesson, Student } from '../types';
 
-import type { User, UserRole, LearningPlan, Lesson } from '../types';
-import { mockStudents } from '../data/mockData';
+const provider = new GoogleAuthProvider();
 
-// --- Mock Firebase SDK ---
+// --- Authentication Service Functions ---
 
-interface MockUser {
-  uid: string;
-  email: string | null;
-  displayName: string | null;
-}
+/**
+ * Listens for authentication state changes and retrieves user role from Firestore.
+ */
+export const onAuthStateChanged = (callback: (user: User | null) => void): (() => void) => {
+    return firebaseOnAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
+        if (firebaseUser) {
+            // User is signed in, now get their role from Firestore.
+            const userDocRef = doc(db, 'users', firebaseUser.uid);
+            const userDocSnap = await getDoc(userDocRef);
 
-// --- Mock Authentication ---
-let mockCurrentUser: MockUser | null = null;
-let onAuthChangedCallback: (user: MockUser | null) => void = () => {};
-
-// --- Mock Firestore Database ---
-const mockDb: { [key: string]: any } = {};
-// Pre-populate DB with mock students
-mockStudents.forEach(student => {
-    if (student.learningPlan) {
-        mockDb[student.uid] = {
-            uid: student.uid,
-            email: student.email,
-            name: student.name,
-            gradeLevel: student.gradeLevel,
-            learningPlan: student.learningPlan
-        };
-    }
-});
-
-
-const auth = {
-  onAuthStateChanged: (callback: (user: MockUser | null) => void) => {
-    onAuthChangedCallback = callback;
-    setTimeout(() => callback(mockCurrentUser), 100); 
-    return () => { onAuthChangedCallback = () => {}; };
-  },
-  signInWithPopup: () => {
-    return new Promise<{ user: MockUser }>((resolve, reject) => {
-      setTimeout(() => {
-        const confirmSignIn = window.confirm("Simulate signing in with Google?");
-        if (confirmSignIn) {
-          const mockUser = {
-            uid: `firebase-uid-${Date.now()}`,
-            email: "student.test@example.com",
-            displayName: "Test User",
-          };
-          // Check if this user exists in our mock DB, otherwise use them.
-          mockCurrentUser = mockDb[mockUser.uid] || mockUser;
-          resolve({ user: mockCurrentUser });
+            if (userDocSnap.exists()) {
+                const userData = userDocSnap.data();
+                const user: User = {
+                    uid: firebaseUser.uid,
+                    email: firebaseUser.email,
+                    displayName: firebaseUser.displayName,
+                    role: userData.role as UserRole,
+                };
+                callback(user);
+            } else {
+                console.warn(`User document not found for uid: ${firebaseUser.uid}. Logging them out.`);
+                await logout();
+                callback(null);
+            }
         } else {
-          reject(new Error("Sign-in cancelled by user."));
+            // User is signed out.
+            callback(null);
         }
-      }, 500);
     });
-  },
-  signOut: () => {
-    return new Promise<void>((resolve) => {
-      setTimeout(() => {
-        mockCurrentUser = null;
-        resolve();
-      }, 200);
-    });
-  }
 };
 
-const firestore = {
-    doc: (path: string) => ({
-        get: () => Promise.resolve({
-            exists: () => !!mockDb[path],
-            data: () => mockDb[path]
-        }),
-        set: (data: any) => {
-            mockDb[path] = data;
-            return Promise.resolve();
-        },
-        update: (data: any) => {
-            mockDb[path] = { ...mockDb[path], ...data };
-            return Promise.resolve();
-        }
-    })
-};
-
-
-// --- Service Functions ---
-
-export const onAuthStateChanged = (callback: (user: User | null) => void) => {
-  return auth.onAuthStateChanged((firebaseUser) => {
-    if (firebaseUser) {
-      const role = (sessionStorage.getItem('userRole') as UserRole) || 'student';
-      callback({ ...firebaseUser, role });
-    } else {
-      callback(null);
-    }
-  });
-};
-
+/**
+ * Signs in the user with Google and creates a user document in Firestore if it's their first time.
+ */
 export const signInWithGoogle = async (role: UserRole): Promise<void> => {
-  try {
-    const result = await auth.signInWithPopup();
-    sessionStorage.setItem('userRole', role);
-    onAuthChangedCallback(result.user);
-  } catch (error) {
-    console.error("Google Sign-In Error:", error);
-    throw error;
-  }
+    try {
+        const result = await signInWithPopup(auth, provider);
+        const user = result.user;
+
+        const userDocRef = doc(db, 'users', user.uid);
+        const userDocSnap = await getDoc(userDocRef);
+
+        if (!userDocSnap.exists()) {
+            await setDoc(userDocRef, {
+                uid: user.uid,
+                email: user.email,
+                displayName: user.displayName,
+                role: role,
+                createdAt: serverTimestamp(),
+            });
+        }
+    } catch (error) {
+        console.error("Error during Google Sign-In:", error);
+        throw error;
+    }
 };
 
+/**
+ * Signs out the current user.
+ */
 export const logout = async (): Promise<void> => {
-  try {
-    await auth.signOut();
-    sessionStorage.removeItem('userRole');
-    onAuthChangedCallback(null);
-  } catch (error) {
-    console.error("Logout Error:", error);
-    throw error;
-  }
+    try {
+        await signOut(auth);
+    } catch (error) {
+        console.error("Logout Error:", error);
+        throw error;
+    }
 };
 
 // --- Firestore Service Functions ---
 
 /**
- * Retrieves a student's learning plan from Firestore.
+ * Retrieves a student's learning plan from their user document in Firestore.
  * @param uid - The user's unique ID.
  * @returns The LearningPlan object or null if not found.
  */
 export const getLearningPlan = async (uid: string): Promise<LearningPlan | null> => {
-    console.log(`Fetching plan for uid: ${uid}`);
-    const docSnap = await firestore.doc(uid).get();
-    if (docSnap.exists()) {
-        console.log("Plan found:", docSnap.data().learningPlan);
+    const userDocRef = doc(db, 'users', uid);
+    const docSnap = await getDoc(userDocRef);
+
+    if (docSnap.exists() && docSnap.data().learningPlan) {
         return docSnap.data().learningPlan as LearningPlan;
     }
-    console.log("No plan found for this user.");
     return null;
 };
 
 /**
- * Saves a new student and their learning plan to Firestore.
+ * Saves a new learning plan to an existing user's document in Firestore.
  * @param uid - The user's unique ID.
  * @param plan - The generated LearningPlan.
+ * @param gradeLevel - The student's grade level.
  */
-export const saveLearningPlan = async (uid: string, plan: LearningPlan, email: string | null, name: string | null, gradeLevel: string): Promise<void> => {
-    console.log(`Saving new plan for uid: ${uid}`);
-    const userDoc = {
-        uid,
-        email,
-        name,
-        gradeLevel,
-        learningPlan: plan
-    };
-    await firestore.doc(uid).set(userDoc);
-    console.log("Plan saved successfully.");
+export const saveLearningPlan = async (uid: string, plan: LearningPlan, gradeLevel: string): Promise<void> => {
+    const userDocRef = doc(db, 'users', uid);
+    await updateDoc(userDocRef, {
+        learningPlan: plan,
+        gradeLevel: gradeLevel
+    });
 };
 
 /**
- * Updates a single lesson within a module in Firestore.
+ * Updates a single lesson within a module in Firestore using dot notation for efficiency.
  * @param uid - The user's unique ID.
  * @param moduleTitle - The title of the module containing the lesson.
  * @param updatedLesson - The lesson object with the new data.
  */
 export const updateLessonInDb = async (uid: string, moduleTitle: string, updatedLesson: Lesson): Promise<void> => {
-    console.log(`Updating lesson "${updatedLesson.title}" for uid: ${uid}`);
-    const docSnap = await firestore.doc(uid).get();
+    const userDocRef = doc(db, 'users', uid);
+    const docSnap = await getDoc(userDocRef);
+
     if (docSnap.exists()) {
         const userData = docSnap.data();
         const currentPlan = userData.learningPlan as LearningPlan;
-        
+
         const newModules = currentPlan.modules.map(module => {
             if (module.title === moduleTitle) {
                 return {
                     ...module,
-                    lessons: module.lessons.map(lesson => 
+                    lessons: module.lessons.map(lesson =>
                         lesson.title === updatedLesson.title ? updatedLesson : lesson
                     )
                 };
@@ -182,9 +139,32 @@ export const updateLessonInDb = async (uid: string, moduleTitle: string, updated
             return module;
         });
 
-        await firestore.doc(uid).update({ learningPlan: { ...currentPlan, modules: newModules } });
-        console.log("Lesson updated successfully in DB.");
+        await updateDoc(userDocRef, {
+            'learningPlan.modules': newModules
+        });
     } else {
-        console.error("Could not update lesson: user document not found.");
+        throw new Error("Could not update lesson: user document not found.");
     }
+};
+
+/**
+ * Fetches all student users from Firestore for the teacher dashboard.
+ */
+export const getStudents = async (): Promise<Student[]> => {
+    const usersCollectionRef = collection(db, 'users');
+    const q = query(usersCollectionRef, where("role", "==", "student"));
+    const querySnapshot = await getDocs(q);
+
+    const studentList: Student[] = [];
+    querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        studentList.push({
+            uid: data.uid,
+            name: data.displayName || 'Unnamed Student',
+            email: data.email || 'No email',
+            gradeLevel: data.gradeLevel || '',
+            learningPlan: data.learningPlan || null,
+        });
+    });
+    return studentList;
 };

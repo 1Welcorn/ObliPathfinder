@@ -6,10 +6,17 @@ import { TeacherIcon } from './icons/TeacherIcon';
 import { CloseIcon } from './icons/CloseIcon';
 import { SendIcon } from './icons/SendIcon';
 
-if (!process.env.API_KEY) {
-  throw new Error("API_KEY environment variable is not set");
-}
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+let ai: GoogleGenAI | null = null;
+const getAi = (): GoogleGenAI => {
+    if (ai) return ai;
+
+    if (!process.env.API_KEY) {
+        throw new Error("API_KEY environment variable is not set.");
+    }
+    ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    return ai;
+};
+
 
 interface VirtualTeacherProps {
     isPortugueseHelpVisible: boolean;
@@ -21,23 +28,31 @@ const VirtualTeacher: React.FC<VirtualTeacherProps> = ({ isPortugueseHelpVisible
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [userInput, setUserInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [initError, setInitError] = useState<string | null>(null);
     const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
     useEffect(() => {
-        if (isOpen && !chat) {
-            const newChat = ai.chats.create({
-                model: 'gemini-2.5-flash',
-                config: {
-                    systemInstruction: 'You are a caring, patient, and encouraging English teacher named Alex. You are bilingual in English and Brazilian Portuguese. Your goal is to help a student preparing for the OBLI fluency competition in Brazil. If the student asks a question in Portuguese, respond in clear, helpful Portuguese. If they write in English, respond in English. Keep your answers concise, friendly, and helpful. Use emojis to make the conversation more engaging.',
-                },
-            });
-            setChat(newChat);
-            const initialMessage = isPortugueseHelpVisible
-                ? "Hello! I'm Alex, your virtual teacher. How can I help you prepare for OBLI today? 😊\n\n(Olá! Eu sou Alex, seu professor virtual. Fique à vontade para perguntar em português se precisar!)"
-                : "Hello! I'm Alex, your virtual teacher. How can I help you prepare for OBLI today? 😊";
-            setMessages([{ sender: 'ai', text: initialMessage }]);
+        if (isOpen && !chat && !initError) {
+            try {
+                const newChat = getAi().chats.create({
+                    model: 'gemini-2.5-flash',
+                    config: {
+                        systemInstruction: 'You are a caring, patient, and encouraging English teacher named Alex. You are bilingual in English and Brazilian Portuguese. Your goal is to help a student preparing for the OBLI fluency competition in Brazil. If the student asks a question in Portuguese, respond in clear, helpful Portuguese. If they write in English, respond in English. Keep your answers concise, friendly, and helpful. Use emojis to make the conversation more engaging.',
+                    },
+                });
+                setChat(newChat);
+                const initialMessage = isPortugueseHelpVisible
+                    ? "Hello! I'm Alex, your virtual teacher. How can I help you prepare for OBLI today? 😊\n\n(Olá! Eu sou Alex, seu professor virtual. Fique à vontade para perguntar em português se precisar!)"
+                    : "Hello! I'm Alex, your virtual teacher. How can I help you prepare for OBLI today? 😊";
+                setMessages([{ sender: 'ai', text: initialMessage }]);
+            } catch (error) {
+                console.error("Failed to initialize virtual teacher:", error);
+                const errorMessage = "I'm having trouble starting up. The AI service may not be configured correctly. 😔";
+                setInitError(errorMessage);
+                setMessages([{ sender: 'ai', text: errorMessage }]);
+            }
         }
-    }, [isOpen, chat, isPortugueseHelpVisible]);
+    }, [isOpen, chat, isPortugueseHelpVisible, initError]);
     
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -114,9 +129,9 @@ const VirtualTeacher: React.FC<VirtualTeacherProps> = ({ isPortugueseHelpVisible
                                 onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
                                 placeholder={isPortugueseHelpVisible ? "Ask me anything... (Pergunte-me...)" : "Ask me anything..."}
                                 className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-                                disabled={isLoading}
+                                disabled={isLoading || !!initError}
                             />
-                            <button onClick={handleSendMessage} disabled={isLoading || !userInput.trim()} className="bg-indigo-600 text-white p-2 rounded-lg disabled:bg-slate-400">
+                            <button onClick={handleSendMessage} disabled={isLoading || !userInput.trim() || !!initError} className="bg-indigo-600 text-white p-2 rounded-lg disabled:bg-slate-400">
                                 <SendIcon className="h-6 w-6" />
                             </button>
                         </div>

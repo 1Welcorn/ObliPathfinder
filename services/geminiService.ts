@@ -2,10 +2,18 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import type { LearningPlan } from '../types';
 
-if (!process.env.API_KEY) {
-  throw new Error("API_KEY environment variable is not set");
+let ai: GoogleGenAI | null = null;
+
+function getAiInstance(): GoogleGenAI {
+  if (!ai) {
+    if (!process.env.API_KEY) {
+      throw new Error("API_KEY environment variable is not set. The application cannot connect to the AI service.");
+    }
+    ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  }
+  return ai;
 }
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
 const model = "gemini-2.5-flash";
 
 const gradeLevelMap: { [key: string]: string } = {
@@ -78,7 +86,7 @@ export const generateLearningPlan = async (studentNeeds: string, gradeLevel: str
   `;
 
   try {
-    const response = await ai.models.generateContent({
+    const response = await getAiInstance().models.generateContent({
       model,
       contents: prompt,
       config: {
@@ -101,7 +109,7 @@ export const generateLearningPlan = async (studentNeeds: string, gradeLevel: str
 
   } catch (error) {
     console.error("Error generating learning plan:", error);
-    throw new Error("Failed to generate the learning plan. The AI model might be busy. Please try again.");
+    throw new Error("Failed to generate the learning plan. The AI model might be busy or the service is not configured correctly. Please try again.");
   }
 };
 
@@ -121,7 +129,7 @@ export const suggestGoal = async (gradeLevel: string): Promise<string> => {
     `;
 
     try {
-      const response = await ai.models.generateContent({
+      const response = await getAiInstance().models.generateContent({
         model,
         contents: prompt,
       });
@@ -131,7 +139,7 @@ export const suggestGoal = async (gradeLevel: string): Promise<string> => {
 
     } catch (error) {
       console.error("Error suggesting goal:", error);
-      throw new Error("Failed to suggest a goal.");
+      throw new Error("Failed to suggest a goal. The AI service may be unavailable.");
     }
 };
 
@@ -160,7 +168,7 @@ export const generatePracticeFeedback = async (practicePrompt: string, studentAn
     `;
 
     try {
-        const response = await ai.models.generateContent({
+        const response = await getAiInstance().models.generateContent({
             model,
             contents: prompt,
         });
@@ -168,6 +176,6 @@ export const generatePracticeFeedback = async (practicePrompt: string, studentAn
         return response.text.trim();
     } catch (error) {
         console.error("Error generating feedback:", error);
-        throw new Error("Failed to generate feedback.");
+        throw new Error("Failed to generate feedback. The AI service may be unavailable.");
     }
 };

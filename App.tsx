@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import type { User, LearningPlan, Module, Lesson, Student } from './types';
-import { onAuthStateChanged, logout, getLearningPlan, saveLearningPlan, updateLessonInDb } from './services/firebaseService';
+import { onAuthStateChanged, logout, getLearningPlan, saveLearningPlan, updateLessonInDb, getStudents } from './services/firebaseService';
 import { generateLearningPlan } from './services/geminiService';
-import { mockStudents } from './data/mockData';
 
 // Components
 import Header from './components/Header';
@@ -38,7 +37,7 @@ const App: React.FC = () => {
     const [completedModuleTitle, setCompletedModuleTitle] = useState<string | null>(null);
 
     // Teacher-specific State
-    const [students, setStudents] = useState<Student[]>(mockStudents);
+    const [students, setStudents] = useState<Student[]>([]);
     const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
     const [collaborators, setCollaborators] = useState<string[]>(['teacher.collaborator@example.com']);
 
@@ -47,8 +46,8 @@ const App: React.FC = () => {
         const unsubscribe = onAuthStateChanged(async (currentUser) => {
             setUser(currentUser);
             if (currentUser) {
+                setIsLoading(true);
                 if (currentUser.role === 'student') {
-                    setIsLoading(true);
                     const plan = await getLearningPlan(currentUser.uid);
                     if (plan) {
                         setLearningPlan(plan);
@@ -58,15 +57,17 @@ const App: React.FC = () => {
                     } else {
                         setView('welcome');
                     }
-                    setIsLoading(false);
                 } else { // Teacher
+                    const studentList = await getStudents();
+                    setStudents(studentList);
                     setView('teacher_dashboard');
                 }
+                setIsLoading(false);
             } else {
                 setView('login');
                 setLearningPlan(null); // Clear data on logout
+                setStudents([]); // Clear student list on logout
             }
-            if(isLoading) setIsLoading(false);
         });
         return () => unsubscribe();
     }, []);
@@ -77,7 +78,7 @@ const App: React.FC = () => {
         setGradeLevel(level);
         try {
             const plan = await generateLearningPlan(studentNeeds, level);
-            await saveLearningPlan(user.uid, plan, user.email, user.displayName, level);
+            await saveLearningPlan(user.uid, plan, level);
             setLearningPlan(plan);
             setView('student_dashboard');
         } catch (error) {
