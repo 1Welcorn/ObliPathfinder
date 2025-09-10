@@ -1,15 +1,15 @@
-import {
-    onAuthStateChanged as firebaseOnAuthStateChanged,
-    signInWithPopup,
-    GoogleAuthProvider,
-    signOut,
-    type User as FirebaseUser
-} from 'firebase/auth';
-import { doc, getDoc, setDoc, updateDoc, serverTimestamp, collection, query, where, getDocs } from 'firebase/firestore';
-import { auth, db } from './firebaseConfig';
+
+// FIX: Switched to Firebase v8 compat imports to resolve module errors.
+import firebase from 'firebase/compat/app';
+import 'firebase/compat/auth';
+import 'firebase/compat/firestore';
+
+import { auth, db, isFirebaseConfigured } from './firebaseConfig';
 import type { User, UserRole, LearningPlan, Lesson, Student } from '../types';
 
-const provider = new GoogleAuthProvider();
+// FIX: Used firebase.auth for GoogleAuthProvider
+const provider = new firebase.auth.GoogleAuthProvider();
+const CONFIG_ERROR_MESSAGE = "Firebase is not configured correctly. Please check your environment variables.";
 
 // --- Authentication Service Functions ---
 
@@ -17,14 +17,21 @@ const provider = new GoogleAuthProvider();
  * Listens for authentication state changes and retrieves user role from Firestore.
  */
 export const onAuthStateChanged = (callback: (user: User | null) => void): (() => void) => {
-    return firebaseOnAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
+    if (!isFirebaseConfigured || !auth || !db) {
+        callback(null);
+        return () => {}; // Return a no-op unsubscribe function
+    }
+    // FIX: Used auth.onAuthStateChanged (v8 compat) and firebase.User type
+    return auth.onAuthStateChanged(async (firebaseUser: firebase.User | null) => {
         if (firebaseUser) {
             // User is signed in, now get their role from Firestore.
-            const userDocRef = doc(db, 'users', firebaseUser.uid);
-            const userDocSnap = await getDoc(userDocRef);
+            // FIX: Used db.collection().doc() (v8 compat)
+            const userDocRef = db.collection('users').doc(firebaseUser.uid);
+            // FIX: Used userDocRef.get() (v8 compat)
+            const userDocSnap = await userDocRef.get();
 
-            if (userDocSnap.exists()) {
-                const userData = userDocSnap.data();
+            if (userDocSnap.exists) {
+                const userData = userDocSnap.data()!;
                 const user: User = {
                     uid: firebaseUser.uid,
                     email: firebaseUser.email,
@@ -48,20 +55,26 @@ export const onAuthStateChanged = (callback: (user: User | null) => void): (() =
  * Signs in the user with Google and creates a user document in Firestore if it's their first time.
  */
 export const signInWithGoogle = async (role: UserRole): Promise<void> => {
+    if (!isFirebaseConfigured || !auth || !db) throw new Error(CONFIG_ERROR_MESSAGE);
     try {
-        const result = await signInWithPopup(auth, provider);
+        // FIX: Used auth.signInWithPopup (v8 compat)
+        const result = await auth.signInWithPopup(provider);
         const user = result.user;
+        if (!user) {
+            throw new Error("Sign in failed, user object is null.");
+        }
 
-        const userDocRef = doc(db, 'users', user.uid);
-        const userDocSnap = await getDoc(userDocRef);
+        const userDocRef = db.collection('users').doc(user.uid);
+        const userDocSnap = await userDocRef.get();
 
-        if (!userDocSnap.exists()) {
-            await setDoc(userDocRef, {
+        if (!userDocSnap.exists) {
+            // FIX: Used userDocRef.set() and firebase.firestore.FieldValue (v8 compat)
+            await userDocRef.set({
                 uid: user.uid,
                 email: user.email,
                 displayName: user.displayName,
                 role: role,
-                createdAt: serverTimestamp(),
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
             });
         }
     } catch (error) {
@@ -74,8 +87,10 @@ export const signInWithGoogle = async (role: UserRole): Promise<void> => {
  * Signs out the current user.
  */
 export const logout = async (): Promise<void> => {
+    if (!isFirebaseConfigured || !auth) throw new Error(CONFIG_ERROR_MESSAGE);
     try {
-        await signOut(auth);
+        // FIX: Used auth.signOut (v8 compat)
+        await auth.signOut();
     } catch (error) {
         console.error("Logout Error:", error);
         throw error;
@@ -90,11 +105,12 @@ export const logout = async (): Promise<void> => {
  * @returns The LearningPlan object or null if not found.
  */
 export const getLearningPlan = async (uid: string): Promise<LearningPlan | null> => {
-    const userDocRef = doc(db, 'users', uid);
-    const docSnap = await getDoc(userDocRef);
+    if (!isFirebaseConfigured || !db) throw new Error(CONFIG_ERROR_MESSAGE);
+    const userDocRef = db.collection('users').doc(uid);
+    const docSnap = await userDocRef.get();
 
-    if (docSnap.exists() && docSnap.data().learningPlan) {
-        return docSnap.data().learningPlan as LearningPlan;
+    if (docSnap.exists && docSnap.data()?.learningPlan) {
+        return docSnap.data()?.learningPlan as LearningPlan;
     }
     return null;
 };
@@ -106,8 +122,10 @@ export const getLearningPlan = async (uid: string): Promise<LearningPlan | null>
  * @param gradeLevel - The student's grade level.
  */
 export const saveLearningPlan = async (uid: string, plan: LearningPlan, gradeLevel: string): Promise<void> => {
-    const userDocRef = doc(db, 'users', uid);
-    await updateDoc(userDocRef, {
+    if (!isFirebaseConfigured || !db) throw new Error(CONFIG_ERROR_MESSAGE);
+    const userDocRef = db.collection('users').doc(uid);
+    // FIX: Used userDocRef.update (v8 compat)
+    await userDocRef.update({
         learningPlan: plan,
         gradeLevel: gradeLevel
     });
@@ -120,11 +138,12 @@ export const saveLearningPlan = async (uid: string, plan: LearningPlan, gradeLev
  * @param updatedLesson - The lesson object with the new data.
  */
 export const updateLessonInDb = async (uid: string, moduleTitle: string, updatedLesson: Lesson): Promise<void> => {
-    const userDocRef = doc(db, 'users', uid);
-    const docSnap = await getDoc(userDocRef);
+    if (!isFirebaseConfigured || !db) throw new Error(CONFIG_ERROR_MESSAGE);
+    const userDocRef = db.collection('users').doc(uid);
+    const docSnap = await userDocRef.get();
 
-    if (docSnap.exists()) {
-        const userData = docSnap.data();
+    if (docSnap.exists) {
+        const userData = docSnap.data()!;
         const currentPlan = userData.learningPlan as LearningPlan;
 
         const newModules = currentPlan.modules.map(module => {
@@ -139,7 +158,7 @@ export const updateLessonInDb = async (uid: string, moduleTitle: string, updated
             return module;
         });
 
-        await updateDoc(userDocRef, {
+        await userDocRef.update({
             'learningPlan.modules': newModules
         });
     } else {
@@ -151,9 +170,11 @@ export const updateLessonInDb = async (uid: string, moduleTitle: string, updated
  * Fetches all student users from Firestore for the teacher dashboard.
  */
 export const getStudents = async (): Promise<Student[]> => {
-    const usersCollectionRef = collection(db, 'users');
-    const q = query(usersCollectionRef, where("role", "==", "student"));
-    const querySnapshot = await getDocs(q);
+    if (!isFirebaseConfigured || !db) throw new Error(CONFIG_ERROR_MESSAGE);
+    const usersCollectionRef = db.collection('users');
+    // FIX: Used collection.where().get() (v8 compat)
+    const q = usersCollectionRef.where("role", "==", "student");
+    const querySnapshot = await q.get();
 
     const studentList: Student[] = [];
     querySnapshot.forEach((doc) => {

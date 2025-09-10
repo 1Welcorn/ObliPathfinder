@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import type { User, LearningPlan, Module, Lesson, Student } from './types';
 import { onAuthStateChanged, logout, getLearningPlan, saveLearningPlan, updateLessonInDb, getStudents } from './services/firebaseService';
 import { generateLearningPlan } from './services/geminiService';
+import { isFirebaseConfigured } from './services/firebaseConfig';
 
 // Components
 import Header from './components/Header';
@@ -17,6 +18,7 @@ import ChallengeUnlockedModal from './components/ChallengeUnlockedModal';
 import NotesView from './components/NotesView';
 import ChallengeArena from './components/ChallengeArena';
 import DatabaseInspectorModal from './components/DatabaseInspectorModal';
+import ConfigErrorScreen from './components/ConfigErrorScreen';
 
 type AppView = 'login' | 'welcome' | 'generating' | 'student_dashboard' | 'module_view' | 'notes_view' | 'challenge_arena' | 'teacher_dashboard' | 'student_progress_view';
 
@@ -25,6 +27,7 @@ const App: React.FC = () => {
     const [user, setUser] = useState<User | null>(null);
     const [view, setView] = useState<AppView>('login');
     const [isLoading, setIsLoading] = useState(true); // For initial auth check
+    const [isConfigError] = useState(!isFirebaseConfigured);
 
     // UI State
     const [isPortugueseHelpVisible, setIsPortugueseHelpVisible] = useState(false);
@@ -43,6 +46,11 @@ const App: React.FC = () => {
 
     // Effect for handling authentication and data fetching
     useEffect(() => {
+        if (isConfigError) {
+            setIsLoading(false);
+            return;
+        }
+
         const unsubscribe = onAuthStateChanged(async (currentUser) => {
             setUser(currentUser);
             if (currentUser) {
@@ -67,10 +75,11 @@ const App: React.FC = () => {
                 setView('login');
                 setLearningPlan(null); // Clear data on logout
                 setStudents([]); // Clear student list on logout
+                setIsLoading(false);
             }
         });
         return () => unsubscribe();
-    }, []);
+    }, [isConfigError]);
 
     const handleStartPlan = async (studentNeeds: string, level: string) => {
         if (!user) return;
@@ -130,6 +139,7 @@ const App: React.FC = () => {
     };
 
     const renderContent = () => {
+        if (isConfigError) return <ConfigErrorScreen />;
         if (isLoading) return <Loader message="Initializing..." />;
         
         switch (view) {
@@ -202,7 +212,7 @@ const App: React.FC = () => {
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                 {renderContent()}
             </main>
-            {user && <VirtualTeacher isPortugueseHelpVisible={isPortugueseHelpVisible} />}
+            {user && !isConfigError && <VirtualTeacher isPortugueseHelpVisible={isPortugueseHelpVisible} />}
             {completedModuleTitle && (
                 <ChallengeUnlockedModal
                     isOpen={!!completedModuleTitle}
