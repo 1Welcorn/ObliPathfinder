@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "rm -rf package-lock.json node_modules/ && npm install @rollup/rollup-linux-x64-gnu --save-optional && vite",
+    "dev": "npm run build && npm i && rm -rf package-lock.json node_modules/ && npm install @rollup/rollup-linux-x64-gnu --save-optional && vite",
     "build": "vite build",
     "preview": "vite preview"
   },
