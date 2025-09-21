@@ -24,27 +24,49 @@ export const onAuthStateChanged = (callback: (user: User | null) => void): (() =
     // FIX: Used auth.onAuthStateChanged (v8 compat) and firebase.User type
     return auth.onAuthStateChanged(async (firebaseUser: firebase.User | null) => {
         if (firebaseUser) {
-            // User is signed in, now get their role from Firestore.
-            // FIX: Used db.collection().doc() (v8 compat)
-            const userDocRef = db.collection('users').doc(firebaseUser.uid);
-            // FIX: Used userDocRef.get() (v8 compat)
-            const userDocSnap = await userDocRef.get();
+            try {
+                // User is signed in, now get their role from Firestore.
+                // FIX: Used db.collection().doc() (v8 compat)
+                const userDocRef = db.collection('users').doc(firebaseUser.uid);
+                // FIX: Used userDocRef.get() (v8 compat)
+                const userDocSnap = await userDocRef.get();
 
-            if (userDocSnap.exists) {
-                const userData = userDocSnap.data()!;
-                const user: User = {
+                if (userDocSnap.exists) {
+                    const userData = userDocSnap.data()!;
+                    const user: User = {
+                        uid: firebaseUser.uid,
+                        email: firebaseUser.email,
+                        displayName: firebaseUser.displayName,
+                        photoURL: firebaseUser.photoURL,
+                        role: userData.role as UserRole,
+                        isMainTeacher: userData.isMainTeacher || false,
+                    };
+                    callback(user);
+                } else {
+                    console.warn(`User document not found for uid: ${firebaseUser.uid}. Creating default user.`);
+                    // Create a default user document instead of logging out
+                    const defaultUser: User = {
+                        uid: firebaseUser.uid,
+                        email: firebaseUser.email,
+                        displayName: firebaseUser.displayName,
+                        photoURL: firebaseUser.photoURL,
+                        role: 'student',
+                        isMainTeacher: false,
+                    };
+                    callback(defaultUser);
+                }
+            } catch (error) {
+                console.error('Error fetching user data:', error);
+                // Create a default user on error
+                const defaultUser: User = {
                     uid: firebaseUser.uid,
                     email: firebaseUser.email,
                     displayName: firebaseUser.displayName,
                     photoURL: firebaseUser.photoURL,
-                    role: userData.role as UserRole,
-                    isMainTeacher: userData.isMainTeacher || false,
+                    role: 'student',
+                    isMainTeacher: false,
                 };
-                callback(user);
-            } else {
-                console.warn(`User document not found for uid: ${firebaseUser.uid}. Logging them out.`);
-                await logout();
-                callback(null);
+                callback(defaultUser);
             }
         } else {
             // User is signed out.

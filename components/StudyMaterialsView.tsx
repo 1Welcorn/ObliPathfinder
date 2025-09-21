@@ -15,12 +15,14 @@ interface StudyMaterialsViewProps {
     studyMaterials: StudyMaterial[];
     onBack: () => void;
     isPortugueseHelpVisible: boolean;
+    onOpenOBLIAI: () => void;
 }
 
 const StudyMaterialsView: React.FC<StudyMaterialsViewProps> = ({
     studyMaterials,
     onBack,
-    isPortugueseHelpVisible
+    isPortugueseHelpVisible,
+    onOpenOBLIAI
 }) => {
     const [selectedType, setSelectedType] = useState<StudyMaterialType | 'all'>('all');
     const [searchTerm, setSearchTerm] = useState('');
@@ -152,6 +154,55 @@ const StudyMaterialsView: React.FC<StudyMaterialsViewProps> = ({
                     </div>
 
                     <div className="lg:w-3/4">
+                        {/* OBLI A.I. Section */}
+                        <div className="mb-8">
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="text-3xl">🤖</div>
+                                <h2 className="text-2xl font-bold text-slate-800">OBLI A.I.</h2>
+                                <span className="px-3 py-1 bg-indigo-100 text-indigo-800 text-sm font-semibold rounded-full">
+                                    AI Assistant
+                                </span>
+                            </div>
+                            <div className="bg-gradient-to-r from-indigo-50 to-purple-50 p-6 rounded-xl border border-indigo-200">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <h3 className="text-xl font-bold text-slate-800 mb-2">
+                                            Seu Assistente de Estudos Inteligente
+                                        </h3>
+                                        <p className="text-slate-600 mb-4">
+                                            Converse com a IA para tirar dúvidas, obter explicações, dicas de estudo e muito mais!
+                                        </p>
+                                        {isPortugueseHelpVisible && (
+                                            <p className="text-sm text-slate-500 italic mb-4">
+                                                Chat with AI to ask questions, get explanations, study tips and much more!
+                                            </p>
+                                        )}
+                                        <div className="flex items-center gap-4 text-sm text-slate-600">
+                                            <span className="flex items-center gap-1">
+                                                <CheckCircleIcon className="h-4 w-4 text-green-500" />
+                                                Explicações personalizadas
+                                            </span>
+                                            <span className="flex items-center gap-1">
+                                                <CheckCircleIcon className="h-4 w-4 text-green-500" />
+                                                Dicas de estudo
+                                            </span>
+                                            <span className="flex items-center gap-1">
+                                                <CheckCircleIcon className="h-4 w-4 text-green-500" />
+                                                Suporte 24/7
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={onOpenOBLIAI}
+                                        className="px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-2"
+                                    >
+                                        <div className="text-xl">🤖</div>
+                                        <span className="font-semibold">Iniciar Chat</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
                         {/* Past Obli Exams Section */}
                         {studyMaterials.filter(m => m.type === 'past_exam').length > 0 && (
                             <div className="mb-8">

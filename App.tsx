@@ -21,8 +21,9 @@ import DatabaseInspectorModal from './components/DatabaseInspectorModal';
 import ConfigErrorScreen from './components/ConfigErrorScreen';
 import StudyMaterialsView from './components/StudyMaterialsView';
 import StudyMaterialsModal from './components/StudyMaterialsModal';
+import OBLIAI from './components/OBLIAI';
 
-type AppView = 'login' | 'welcome' | 'generating' | 'student_dashboard' | 'module_view' | 'notes_view' | 'challenge_arena' | 'study_materials_view' | 'teacher_dashboard' | 'student_progress_view';
+type AppView = 'login' | 'welcome' | 'generating' | 'student_dashboard' | 'module_view' | 'notes_view' | 'challenge_arena' | 'study_materials_view' | 'obli_ai' | 'teacher_dashboard' | 'student_progress_view';
 
 const App: React.FC = () => {
     // Core State
@@ -282,6 +283,7 @@ const App: React.FC = () => {
                     isPortugueseHelpVisible={isPortugueseHelpVisible}
                  />;
         case 'challenge_arena':
+            console.log('Rendering ChallengeArena with user:', user);
             return <ChallengeArena 
                 onBack={() => setView('student_dashboard')}
                 isPortugueseHelpVisible={isPortugueseHelpVisible}
@@ -292,7 +294,14 @@ const App: React.FC = () => {
                     studyMaterials={studyMaterials}
                     onBack={() => setView('student_dashboard')}
                     isPortugueseHelpVisible={isPortugueseHelpVisible}
+                    onOpenOBLIAI={() => setView('obli_ai')}
                  />;
+            case 'obli_ai':
+                return <OBLIAI
+                    onBack={() => setView('study_materials_view')}
+                    isPortugueseHelpVisible={isPortugueseHelpVisible}
+                    currentUser={user}
+                />;
             case 'teacher_dashboard':
                 return <TeacherDashboard
                     students={students}
