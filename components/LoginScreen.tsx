@@ -37,6 +37,18 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ isPortugueseHelpVisible }) =>
         <div className="bg-white/80 backdrop-blur-lg p-8 rounded-2xl shadow-2xl border border-slate-200 mt-8">
             <h2 className="text-2xl font-bold text-slate-800 mb-2">Login or Sign Up</h2>
             {isPortugueseHelpVisible && <p className="text-sm text-slate-500 italic mb-4">Entre ou Cadastre-se</p>}
+            
+            <div className="mb-6 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-blue-800">
+                    <span className="font-semibold">Note:</span> You can switch between Student and Teacher roles. Choose the role that matches your current needs.
+                </p>
+                {isPortugueseHelpVisible && (
+                    <p className="text-xs text-blue-700 italic mt-1">
+                        Você pode alternar entre os papéis de Estudante e Professor. Escolha o papel que corresponde às suas necessidades atuais.
+                    </p>
+                )}
+            </div>
+            
             <div className="space-y-4">
                <button
                     onClick={() => handleLogin('student')}

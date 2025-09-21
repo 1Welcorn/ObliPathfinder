@@ -13,6 +13,7 @@ interface DashboardProps {
   onSelectModule: (module: Module) => void;
   onViewNotes: () => void;
   onViewChallenges: () => void;
+  onViewStudyMaterials: () => void;
   isPortugueseHelpVisible: boolean;
 }
 
@@ -56,7 +57,7 @@ const ModuleCard: React.FC<{ module: Module; onSelect: () => void; isPortugueseH
 };
 
 
-const Dashboard: React.FC<DashboardProps> = ({ plan, onSelectModule, onViewNotes, onViewChallenges, isPortugueseHelpVisible }) => {
+const Dashboard: React.FC<DashboardProps> = ({ plan, onSelectModule, onViewNotes, onViewChallenges, onViewStudyMaterials, isPortugueseHelpVisible }) => {
   return (
     <div className="animate-fade-in">
       <div className="mb-8">
@@ -69,22 +70,32 @@ const Dashboard: React.FC<DashboardProps> = ({ plan, onSelectModule, onViewNotes
         <CountdownMilestone plan={plan} isPortugueseHelpVisible={isPortugueseHelpVisible} />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <button onClick={onViewNotes} className="flex flex-col items-center justify-center gap-2 bg-white p-6 rounded-2xl shadow-lg border border-slate-200 hover:shadow-xl hover:border-indigo-300 transition-all">
-            <DocumentTextIcon className="h-10 w-10 text-fuchsia-500" />
-            <span className="font-bold text-lg text-slate-700">My Notes</span>
-            {isPortugueseHelpVisible && <p className="text-xs text-slate-500 italic">Minhas Anotações</p>}
-        </button>
-        <button onClick={onViewChallenges} className="flex flex-col items-center justify-center gap-2 bg-white p-6 rounded-2xl shadow-lg border border-slate-200 hover:shadow-xl hover:border-indigo-300 transition-all">
-            <TrophyIcon className="h-10 w-10 text-yellow-500" />
-            <span className="font-bold text-lg text-slate-700">Challenge Arena</span>
-            {isPortugueseHelpVisible && <p className="text-xs text-slate-500 italic">Arena de Desafios</p>}
-        </button>
-        <div className="flex flex-col items-center justify-center gap-2 bg-white p-6 rounded-2xl shadow-lg border border-slate-200">
+      <div className="flex flex-col md:flex-row gap-6 mb-8">
+        {/* Study Materials - Far Left */}
+        <div className="w-full md:w-80">
+          <button onClick={onViewStudyMaterials} className="w-full flex flex-col items-center justify-center gap-2 bg-white p-6 rounded-2xl shadow-lg border border-slate-200 hover:shadow-xl hover:border-indigo-300 transition-all">
              <BookOpenIcon className="h-10 w-10 text-teal-500" />
             <span className="font-bold text-lg text-slate-700">Study Materials</span>
             {isPortugueseHelpVisible && <p className="text-xs text-slate-500 italic">Materiais de Estudo</p>}
-            <span className="text-xs text-slate-400 font-semibold">(Coming Soon)</span>
+          </button>
+        </div>
+        
+        {/* Challenge Arena - Center */}
+        <div className="flex-1">
+          <button onClick={onViewChallenges} className="w-full flex flex-col items-center justify-center gap-2 bg-white p-6 rounded-2xl shadow-lg border border-slate-200 hover:shadow-xl hover:border-indigo-300 transition-all">
+              <TrophyIcon className="h-10 w-10 text-yellow-500" />
+              <span className="font-bold text-lg text-slate-700">Challenge Arena</span>
+              {isPortugueseHelpVisible && <p className="text-xs text-slate-500 italic">Arena de Desafios</p>}
+          </button>
+        </div>
+        
+        {/* My Notes - Far Right */}
+        <div className="w-full md:w-80">
+          <button onClick={onViewNotes} className="w-full flex flex-col items-center justify-center gap-2 bg-white p-6 rounded-2xl shadow-lg border border-slate-200 hover:shadow-xl hover:border-indigo-300 transition-all">
+              <DocumentTextIcon className="h-10 w-10 text-fuchsia-500" />
+              <span className="font-bold text-lg text-slate-700">My Notes</span>
+              {isPortugueseHelpVisible && <p className="text-xs text-slate-500 italic">Minhas Anotações</p>}
+          </button>
         </div>
       </div>
 

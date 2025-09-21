@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type { User } from '../types';
 import { GraduationCapIcon } from './icons/GraduationCapIcon';
 import { UsersIcon } from './icons/UsersIcon';
 import { ArrowRightOnRectangleIcon } from './icons/ArrowRightOnRectangleIcon';
-import { GlobeIcon } from './icons/GlobeIcon';
+import { LightBulbIcon } from './icons/LightBulbIcon';
 import { DatabaseIcon } from './icons/DatabaseIcon';
+import { setMainTeacher } from '../services/firebaseService';
 
 interface HeaderProps {
     user: User | null;
@@ -15,58 +16,154 @@ interface HeaderProps {
 }
 
 const Header: React.FC<HeaderProps> = ({ user, onLogout, isPortugueseHelpVisible, onTogglePortugueseHelp, onOpenDatabaseInspector }) => {
+    const [isSettingMainTeacher, setIsSettingMainTeacher] = useState(false);
+    const [isUserInfoExpanded, setIsUserInfoExpanded] = useState(false);
     const roleText = user?.role === 'student' ? 'Student View' : 'Teacher View';
     const RoleIcon = user?.role === 'student' ? GraduationCapIcon : UsersIcon;
 
-    return (
-        <header className="bg-white/80 backdrop-blur-lg shadow-md sticky top-0 z-40 mb-8">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="flex items-center justify-between h-16">
-                    <div className="flex items-center gap-3">
-                        <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiByeD0iOCIgZmlsbD0iIzZERTVGRiIvPgo8cGF0aCBkPSJNMjAuMjc2NiAxMC42OTQ5QzE5LjQ5ODQgMTAuNjk0OSAxOC44NDY3IDEwLjk4NDggMTguMzIxOCAxMS41NjQ1QzE3Ljc5NjkgMTIuMTQ0MyAxNy41MDcgMTIuODgwOSAxNy41MDcgMTMuNzgzN1YxNC45MDY5SDIxLjA0NjJWMTMuNzgzN0MyMS4wNDYyIDEzLjIxNTkgMjAuOTA5MyAxMi42ODA0IDIwLjQ1NzcgMTIuMjA4MkMyMC4wMDYxIDExLjczNTkgMTkuNDY4NSAxMS40NjA5IDE4Ljg0NjcgMTEuNDYwOUgxOC43MzIyQzE4LjM5MjMgMTEuNDYwOSAxOC4wNjM4IDExLjU3NDYgMTcuNzQ2OCAxMS44MDE1QzE3LjQyOTggMTIuMDI4MyAxNy4yODQzIDEyLjM0NCAxNy4yODQzIDEyLjc0ODNWMTMuNzgzN0MxNy4yODQzIDEzLjMwOTggMTcuMzk4IDEzLjc4ODkgMTcuNjI1assiMTQuMjIwOUMxNy44NTMgMTQuNjUyOCAxOC4xODE2IDE0Ljk2OTggMTguNjExNSAxNS4xNzE1QzE5LjA0MTUgMTUuMzczMiAxOS41MzE0IDE1LjQ3MyAyMC45ODEzIDE1LjQ3M0MyMC42NzYxIDE1LjQ3MyAyMS4yNzQzIDE1LjI2ODkgMjEuNzc1OSAxNC44NjA3QzIyLjI3NzYgMTQuNDUyNiAyMy4xMDE1IDEzLjQzMjMgMjMuMTAxNSAxMy40MzIzTDIwLjgyMzMgMTEuNTI4MUMyMC44MjMzIDExLjUyODEgMjAuNTUxNiAxMS4xMTQ0IDIwLjI3NjYgMTAuNjk0OVoiIGZpbGw9IndoaXRlIi8+CjxwYXRoIGQ9Ik0yNy4wOTY3IDE4LjUzNTJDzI2LjAzMzQgMTcuNDcyNSAyNC43MzIyIDE2Ljk0MTggMjMuMTUyOSAxNi45NDE4QzIxLjQxMTkgMTYuOTQxOCAxOS45NTUgMTcuNTQwNCAxOC43ODkxIDE4LjczNzhDMTcuNjIzMyAxOS45MzUyIDE3LjAzOTUgMjEuNDA0MyAxNy4wMzk1IDEyMy4xNTQ4QzE3LjAzOTUgMjQuOTA1NCAxNy42MjMzIDI2LjM3NDUgMTguNzg5MSAyNy41NzE5QzE5Ljk1NSAyOC43NjkzIDIxLjQxMTkgMjkuMzY3OSAyMy4xNTI5IDI5LjM2NzlDMjQuNzMyMiAyOS4zNjc5IDI2LjAzMzQgMjguODQ2MSAyNy4wOTY3IDI3Ljc4MjhDMjguMTYgMjYuNzE5NSAyOC42OTA4IDI1LjQ0MDQgMjguNjkwOCAyMy45NDU1VjIyLjM2NjJIMjIuNjIyMlYyMy45NDU1QzIyLjYyMjIgMjQuODU5MiAyMi4zMzA3IDI1LjYxMyAyMS43NDc2IDI2LjIwN0MyMS4xNjQ2IDI2Ljc4ODkgMjAuNDE4OCAyNy4wODgzIDE5LjUwMDYgMjcuMDg4M0MxOC40MTA3IDI3LjA4ODMgMTcuNTM2OSAyNi43NTk3IDE2Ljg3OTEgMjYuMDczOUMxNi4yMjE0IDI1LjM4ODIgMTUuODk3NSAyNC40MDQ3IDE1Ljg5NzUgMjMuMTM5M0MxNS44OTc1IDIxLjg3MzggMTYuMjIxNCAyMC44OTA4IDE2Ljg3OTEgMjAuMTk5MUMxNy41MzY5IDE5LjUyNzUgMTguNDEwNyAxOS4xOTE3IDE5LjUwMDYgMTkuMTkxN0MyMC40MTg4IDE5LjE5MTcgMjEuMTY0NiAxOS40OTEyIDIxLjc0NzYgMjAuMDczQzIyLjMzMDcgMjAuNjU0OSAyMi42MjIyIDIxLjQwODcgMjIuNjIyMiAyMi4zNjYySDI4LjY5MDhWMjEuNzg3OUMyOC42OTA4IDIwLjE4NTQgMjguMTYgMTkuNTk5MSAyNy4wOTY3IDE4LjUzNThaIiBmaWxsPSJ3aGl0ZSIvPgo8L3N2Zz4K" alt="OBLI Pathfinder Logo" className="h-10 w-10" />
-                        <span className="text-xl font-bold text-slate-800 hidden sm:block">OBLI Pathfinder</span>
-                         {user && (
-                            <>
-                                <div className="w-px h-6 bg-slate-300 mx-2 hidden sm:block"></div>
-                                <div className="flex items-center gap-2 text-slate-600">
-                                    <RoleIcon className="h-6 w-6" />
-                                    <span className="font-semibold">{roleText}</span>
-                                </div>
-                            </>
-                        )}
-                    </div>
-                    <div className="flex items-center gap-4">
-                        <button
-                            onClick={onTogglePortugueseHelp}
-                            className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-semibold transition-colors ${isPortugueseHelpVisible ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
-                            title="Toggle Portuguese help text"
-                        >
-                            <GlobeIcon className="h-5 w-5" />
-                            <span className="hidden md:inline">{isPortugueseHelpVisible ? 'Ajuda ON' : 'Ajuda OFF'}</span>
-                        </button>
+    const handleSetMainTeacher = async () => {
+        if (!user?.email) return;
+        setIsSettingMainTeacher(true);
+        try {
+            await setMainTeacher(user.email);
+            alert('You are now set as the main teacher! Please refresh the page.');
+        } catch (error) {
+            console.error('Error setting main teacher:', error);
+            alert('Error setting main teacher. Please try again.');
+        } finally {
+            setIsSettingMainTeacher(false);
+        }
+    };
 
-                         <button
-                            onClick={onOpenDatabaseInspector}
-                            className="p-2 rounded-md bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors"
-                            title="Inspect App State"
-                        >
-                            <DatabaseIcon className="h-5 w-5" />
-                        </button>
-                        
-                        {user && (
-                             <button
-                                onClick={onLogout}
-                                className="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-semibold bg-slate-100 text-slate-700 hover:bg-red-100 hover:text-red-700 transition-colors"
-                                title="Log out"
+    return (
+        <>
+            <header className="bg-white/80 backdrop-blur-lg shadow-md sticky top-0 z-40">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <div className="flex items-center justify-between h-16">
+                        <div className="flex items-center gap-3">
+                            {/* Modern MEW Logo - Three perfect squares with letters */}
+                            <div className="flex gap-1">
+                                <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-lg flex items-center justify-center shadow-md">
+                                    <span className="text-white font-bold text-sm">M</span>
+                                </div>
+                                <div className="w-8 h-8 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-lg flex items-center justify-center shadow-md">
+                                    <span className="text-white font-bold text-sm">E</span>
+                                </div>
+                                <div className="w-8 h-8 bg-gradient-to-br from-amber-500 to-amber-600 rounded-lg flex items-center justify-center shadow-md">
+                                    <span className="text-white font-bold text-sm">W</span>
+                                </div>
+                            </div>
+                            <span className="text-xl font-bold text-slate-800 hidden sm:block">OBLI Pathfinder</span>
+                             {user && (
+                                <>
+                                    <div className="w-px h-6 bg-slate-300 mx-2 hidden sm:block"></div>
+                                    
+                                    <button
+                                        onClick={() => setIsUserInfoExpanded(!isUserInfoExpanded)}
+                                        className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-200 ${isUserInfoExpanded ? 'bg-green-100 text-green-700' : 'text-slate-600 hover:bg-slate-100'}`}
+                                        title={isUserInfoExpanded ? 'Click to hide user info' : 'Click to show user info'}
+                                    >
+                                        <RoleIcon className="h-6 w-6" />
+                                        <span className="font-semibold">{roleText}</span>
+                                    </button>
+                                    
+                                    {isUserInfoExpanded && (
+                                        <div className="absolute top-16 left-4 bg-white border border-slate-200 rounded-lg shadow-lg p-3 z-50">
+                                            <div className="text-sm">
+                                                <div className="font-semibold text-slate-800 mb-1">User Information</div>
+                                                <div className="text-slate-600">
+                                                    <div><span className="font-medium">Email:</span> {user.email}</div>
+                                                    <div><span className="font-medium">Role:</span> {user.role}</div>
+                                                    {user.displayName && (
+                                                        <div><span className="font-medium">Name:</span> {user.displayName}</div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </>
+                            )}
+                        </div>
+                        <div className="flex items-center gap-4">
+                            <button
+                                onClick={onTogglePortugueseHelp}
+                                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 ${isPortugueseHelpVisible ? 'bg-green-100 text-green-600 shadow-md' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                                title={isPortugueseHelpVisible ? 'Portuguese translation help is ON' : 'Click to turn ON Portuguese translation help'}
                             >
-                                <ArrowRightOnRectangleIcon className="h-5 w-5" />
-                                <span className="hidden md:inline">Logout</span>
+                                <div className={`relative transition-colors ${isPortugueseHelpVisible ? 'text-green-600' : 'text-slate-600'}`}>
+                                    <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
+                                        <path d="M12 2C8.13 2 5 5.13 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.87-3.13-7-7-7zm2.85 11.1l-.85.6V16h-4v-2.3l-.85-.6C7.8 12.16 7 10.63 7 9c0-2.76 2.24-5 5-5s5 2.24 5 5c0 1.63-.8 3.16-2.15 4.1z"/>
+                                        <path d="M9 21c0 .55.45 1 1 1h4c.55 0 1-.45 1-1v-1H9v1z"/>
+                                    </svg>
+                                </div>
+                                <span className="text-sm font-medium">Portuguese Help</span>
                             </button>
-                        )}
+
+                             <button
+                                onClick={onOpenDatabaseInspector}
+                                className="p-2 rounded-md bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors"
+                                title="Inspect App State"
+                            >
+                                <DatabaseIcon className="h-5 w-5" />
+                            </button>
+
+                            {/* Temporary admin button - only show for teachers who aren't main teacher yet */}
+                            {user && user.role === 'teacher' && !user.isMainTeacher && (
+                                <button
+                                    onClick={handleSetMainTeacher}
+                                    disabled={isSettingMainTeacher}
+                                    className="px-3 py-2 rounded-md text-sm font-semibold bg-amber-100 text-amber-700 hover:bg-amber-200 transition-colors disabled:opacity-50"
+                                    title="Set yourself as main teacher (admin access)"
+                                >
+                                    {isSettingMainTeacher ? 'Setting...' : 'Set Main Teacher'}
+                                </button>
+                            )}
+                            
+                            {user && (
+                                 <button
+                                    onClick={onLogout}
+                                    className="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-semibold bg-slate-100 text-slate-700 hover:bg-red-100 hover:text-red-700 transition-colors"
+                                    title="Log out"
+                                >
+                                    <ArrowRightOnRectangleIcon className="h-5 w-5" />
+                                    <span className="hidden md:inline">Logout</span>
+                                </button>
+                            )}
+                        </div>
                     </div>
                 </div>
-            </div>
-        </header>
+            </header>
+            
+            {/* User Profile Image Section - Upper Middle */}
+            {user && (
+                <div className="bg-gradient-to-r from-slate-50 to-slate-100 border-b border-slate-200 mb-8">
+                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+                        <div className="flex justify-center">
+                            <div className="flex flex-col items-center gap-3">
+                                <div className="relative">
+                                    <img
+                                        src={user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.displayName || user.email || 'User')}&background=6366f1&color=fff&size=80`}
+                                        alt={user.displayName || 'User'}
+                                        className="w-20 h-20 rounded-full border-4 border-white shadow-lg"
+                                    />
+                                    <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-green-500 border-3 border-white rounded-full flex items-center justify-center">
+                                        <div className="w-2 h-2 bg-white rounded-full"></div>
+                                    </div>
+                                </div>
+                                <div className="text-center">
+                                    <h2 className="text-xl font-bold text-slate-800">
+                                        {user.displayName || 'Welcome'}
+                                    </h2>
+                                    <p className="text-sm text-slate-600 capitalize">
+                                        {user.role} • {user.email}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </>
     );
 };
 

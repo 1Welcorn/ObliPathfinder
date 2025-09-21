@@ -5,7 +5,7 @@ import 'firebase/compat/auth';
 import 'firebase/compat/firestore';
 
 import { auth, db, isFirebaseConfigured } from './firebaseConfig';
-import type { User, UserRole, LearningPlan, Lesson, Student } from '../types';
+import type { User, UserRole, LearningPlan, Lesson, Student, StudyMaterial, Challenge, ChallengeSubmission, StudentLeaderboardEntry, ChallengeLeaderboard } from '../types';
 
 // FIX: Used firebase.auth for GoogleAuthProvider
 const provider = new firebase.auth.GoogleAuthProvider();
@@ -36,7 +36,9 @@ export const onAuthStateChanged = (callback: (user: User | null) => void): (() =
                     uid: firebaseUser.uid,
                     email: firebaseUser.email,
                     displayName: firebaseUser.displayName,
+                    photoURL: firebaseUser.photoURL,
                     role: userData.role as UserRole,
+                    isMainTeacher: userData.isMainTeacher || false,
                 };
                 callback(user);
             } else {
@@ -73,9 +75,21 @@ export const signInWithGoogle = async (role: UserRole): Promise<void> => {
                 uid: user.uid,
                 email: user.email,
                 displayName: user.displayName,
+                photoURL: user.photoURL,
                 role: role,
+                isMainTeacher: role === 'teacher', // Only teachers can be main teachers, and first teacher is main
                 createdAt: firebase.firestore.FieldValue.serverTimestamp(),
             });
+        } else {
+            // User exists, update their role if it's different
+            const existingData = userDocSnap.data()!;
+            if (existingData.role !== role) {
+                await userDocRef.update({
+                    role: role,
+                    isMainTeacher: role === 'teacher' ? existingData.isMainTeacher || false : false, // Preserve main teacher status for teachers, remove for students
+                    lastRoleChange: firebase.firestore.FieldValue.serverTimestamp(),
+                });
+            }
         }
     } catch (error) {
         console.error("Error during Google Sign-In:", error);
@@ -188,4 +202,354 @@ export const getStudents = async (): Promise<Student[]> => {
         });
     });
     return studentList;
+};
+
+/**
+ * Sets a user as the main teacher (only for initial setup or admin purposes)
+ * This should only be called by the system administrator or main teacher
+ */
+export const setMainTeacher = async (userEmail: string): Promise<void> => {
+    if (!isFirebaseConfigured || !db) throw new Error(CONFIG_ERROR_MESSAGE);
+    
+    // First, remove main teacher status from all users
+    const usersCollectionRef = db.collection('users');
+    const allUsersSnapshot = await usersCollectionRef.where("role", "==", "teacher").get();
+    
+    const batch = db.batch();
+    allUsersSnapshot.forEach((doc) => {
+        batch.update(doc.ref, { isMainTeacher: false });
+    });
+    
+    // Then set the specified user as main teacher
+    const targetUserSnapshot = await usersCollectionRef.where("email", "==", userEmail).get();
+    if (!targetUserSnapshot.empty) {
+        const targetUserDoc = targetUserSnapshot.docs[0];
+        batch.update(targetUserDoc.ref, { isMainTeacher: true });
+    } else {
+        throw new Error(`User with email ${userEmail} not found`);
+    }
+    
+    await batch.commit();
+};
+
+// Study Materials CRUD Operations
+export const addStudyMaterial = async (material: Omit<StudyMaterial, 'id' | 'createdAt'>): Promise<string> => {
+    if (!isFirebaseConfigured || !db) throw new Error(CONFIG_ERROR_MESSAGE);
+    
+    const docRef = await db.collection('studyMaterials').add({
+        ...material,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    
+    return docRef.id;
+};
+
+export const updateStudyMaterial = async (id: string, updates: Partial<StudyMaterial>): Promise<void> => {
+    if (!isFirebaseConfigured || !db) throw new Error(CONFIG_ERROR_MESSAGE);
+    
+    await db.collection('studyMaterials').doc(id).update(updates);
+};
+
+export const deleteStudyMaterial = async (id: string): Promise<void> => {
+    if (!isFirebaseConfigured || !db) throw new Error(CONFIG_ERROR_MESSAGE);
+    
+    await db.collection('studyMaterials').doc(id).delete();
+};
+
+export const getStudyMaterials = async (): Promise<StudyMaterial[]> => {
+    if (!isFirebaseConfigured || !db) throw new Error(CONFIG_ERROR_MESSAGE);
+    
+    const snapshot = await db.collection('studyMaterials')
+        .orderBy('createdAt', 'desc')
+        .get();
+    
+    return snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+            id: doc.id,
+            ...data,
+            createdAt: data.createdAt?.toDate() || new Date(),
+            dueDate: data.dueDate?.toDate() || undefined,
+        } as StudyMaterial;
+    });
+};
+
+export const subscribeToStudyMaterials = (callback: (materials: StudyMaterial[]) => void): (() => void) => {
+    if (!isFirebaseConfigured || !db) {
+        console.error(CONFIG_ERROR_MESSAGE);
+        return () => {};
+    }
+    
+    return db.collection('studyMaterials')
+        .orderBy('createdAt', 'desc')
+        .onSnapshot((snapshot) => {
+            const materials = snapshot.docs.map(doc => {
+                const data = doc.data();
+                return {
+                    id: doc.id,
+                    ...data,
+                    createdAt: data.createdAt?.toDate() || new Date(),
+                    dueDate: data.dueDate?.toDate() || undefined,
+                } as StudyMaterial;
+            });
+            callback(materials);
+        });
+};
+
+// Challenge CRUD Operations
+export const addChallenge = async (challenge: Omit<Challenge, 'id' | 'createdAt'>): Promise<string> => {
+    if (!isFirebaseConfigured || !db) throw new Error(CONFIG_ERROR_MESSAGE);
+    
+    const docRef = await db.collection('challenges').add({
+        ...challenge,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    
+    return docRef.id;
+};
+
+export const updateChallenge = async (id: string, updates: Partial<Challenge>): Promise<void> => {
+    if (!isFirebaseConfigured || !db) throw new Error(CONFIG_ERROR_MESSAGE);
+    
+    await db.collection('challenges').doc(id).update(updates);
+};
+
+export const deleteChallenge = async (id: string): Promise<void> => {
+    if (!isFirebaseConfigured || !db) throw new Error(CONFIG_ERROR_MESSAGE);
+    
+    await db.collection('challenges').doc(id).delete();
+};
+
+export const getChallenges = async (): Promise<Challenge[]> => {
+    if (!isFirebaseConfigured || !db) throw new Error(CONFIG_ERROR_MESSAGE);
+    
+    const snapshot = await db.collection('challenges')
+        .where('isActive', '==', true)
+        .orderBy('createdAt', 'desc')
+        .get();
+    
+    return snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+            id: doc.id,
+            ...data,
+            createdAt: data.createdAt?.toDate() || new Date(),
+        } as Challenge;
+    });
+};
+
+export const subscribeToChallenges = (callback: (challenges: Challenge[]) => void): (() => void) => {
+    if (!isFirebaseConfigured || !db) {
+        console.error(CONFIG_ERROR_MESSAGE);
+        return () => {};
+    }
+    
+    return db.collection('challenges')
+        .where('isActive', '==', true)
+        .orderBy('createdAt', 'desc')
+        .onSnapshot((snapshot) => {
+            const challenges = snapshot.docs.map(doc => {
+                const data = doc.data();
+                return {
+                    id: doc.id,
+                    ...data,
+                    createdAt: data.createdAt?.toDate() || new Date(),
+                } as Challenge;
+            });
+            callback(challenges);
+        });
+};
+
+// Challenge Submission Operations
+export const submitChallengeAnswer = async (submission: Omit<ChallengeSubmission, 'id' | 'submittedAt'>): Promise<string> => {
+    if (!isFirebaseConfigured || !db) throw new Error(CONFIG_ERROR_MESSAGE);
+    
+    const docRef = await db.collection('challengeSubmissions').add({
+        ...submission,
+        submittedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    
+    return docRef.id;
+};
+
+export const getUserChallengeSubmissions = async (userId: string): Promise<ChallengeSubmission[]> => {
+    if (!isFirebaseConfigured || !db) throw new Error(CONFIG_ERROR_MESSAGE);
+    
+    const snapshot = await db.collection('challengeSubmissions')
+        .where('userId', '==', userId)
+        .orderBy('submittedAt', 'desc')
+        .get();
+    
+    return snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+            id: doc.id,
+            ...data,
+            submittedAt: data.submittedAt?.toDate() || new Date(),
+        } as ChallengeSubmission;
+    });
+};
+
+export const getUserChallengeStats = async (userId: string): Promise<{
+    totalChallenges: number;
+    correctAnswers: number;
+    totalPoints: number;
+    averageTime: number;
+}> => {
+    if (!isFirebaseConfigured || !db) throw new Error(CONFIG_ERROR_MESSAGE);
+    
+    const submissions = await getUserChallengeSubmissions(userId);
+    
+    const totalChallenges = submissions.length;
+    const correctAnswers = submissions.filter(s => s.isCorrect).length;
+    const totalPoints = submissions.reduce((sum, s) => sum + s.pointsEarned, 0);
+    const averageTime = totalChallenges > 0 
+        ? submissions.reduce((sum, s) => sum + s.timeSpent, 0) / totalChallenges 
+        : 0;
+    
+    return {
+        totalChallenges,
+        correctAnswers,
+        totalPoints,
+        averageTime
+    };
+};
+
+// Leaderboard Operations
+export const getStudentLeaderboard = async (limit: number = 10): Promise<StudentLeaderboardEntry[]> => {
+    if (!isFirebaseConfigured || !db) throw new Error(CONFIG_ERROR_MESSAGE);
+    
+    // Get all students
+    const studentsSnapshot = await db.collection('users')
+        .where('role', '==', 'student')
+        .get();
+    
+    const leaderboard: StudentLeaderboardEntry[] = [];
+    
+    for (const studentDoc of studentsSnapshot.docs) {
+        const studentData = studentDoc.data();
+        const userId = studentDoc.id;
+        
+        // Get student's challenge submissions
+        const submissionsSnapshot = await db.collection('challengeSubmissions')
+            .where('userId', '==', userId)
+            .get();
+        
+        const submissions = submissionsSnapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+                ...data,
+                submittedAt: data.submittedAt?.toDate() || new Date(),
+            } as ChallengeSubmission;
+        });
+        
+        if (submissions.length > 0) {
+            const totalPoints = submissions.reduce((sum, s) => sum + s.pointsEarned, 0);
+            const correctAnswers = submissions.filter(s => s.isCorrect).length;
+            const averageTime = submissions.reduce((sum, s) => sum + s.timeSpent, 0) / submissions.length;
+            const lastActivity = submissions.reduce((latest, s) => 
+                s.submittedAt > latest ? s.submittedAt : latest, new Date(0)
+            );
+            
+            // Calculate win streak (consecutive correct answers)
+            let winStreak = 0;
+            const sortedSubmissions = submissions.sort((a, b) => 
+                a.submittedAt.getTime() - b.submittedAt.getTime()
+            );
+            
+            for (let i = sortedSubmissions.length - 1; i >= 0; i--) {
+                if (sortedSubmissions[i].isCorrect) {
+                    winStreak++;
+                } else {
+                    break;
+                }
+            }
+            
+            leaderboard.push({
+                userId,
+                displayName: studentData.displayName || 'Student',
+                email: studentData.email || '',
+                photoURL: studentData.photoURL,
+                totalPoints,
+                totalChallenges: submissions.length,
+                correctAnswers,
+                averageTime,
+                winStreak,
+                lastActivity
+            });
+        }
+    }
+    
+    // Sort by total points (descending), then by correct answers, then by average time
+    return leaderboard
+        .sort((a, b) => {
+            if (b.totalPoints !== a.totalPoints) return b.totalPoints - a.totalPoints;
+            if (b.correctAnswers !== a.correctAnswers) return b.correctAnswers - a.correctAnswers;
+            return a.averageTime - b.averageTime;
+        })
+        .slice(0, limit);
+};
+
+export const getChallengeLeaderboard = async (challengeId: string, limit: number = 10): Promise<ChallengeLeaderboard | null> => {
+    if (!isFirebaseConfigured || !db) throw new Error(CONFIG_ERROR_MESSAGE);
+    
+    // Get challenge details
+    const challengeDoc = await db.collection('challenges').doc(challengeId).get();
+    if (!challengeDoc.exists) return null;
+    
+    const challengeData = challengeDoc.data()!;
+    
+    // Get top submissions for this challenge
+    const submissionsSnapshot = await db.collection('challengeSubmissions')
+        .where('challengeId', '==', challengeId)
+        .where('isCorrect', '==', true)
+        .orderBy('pointsEarned', 'desc')
+        .orderBy('timeSpent', 'asc')
+        .limit(limit)
+        .get();
+    
+    const topSubmissions = [];
+    
+    for (const submissionDoc of submissionsSnapshot.docs) {
+        const submissionData = submissionDoc.data();
+        
+        // Get user details
+        const userDoc = await db.collection('users').doc(submissionData.userId).get();
+        const userData = userDoc.exists ? userDoc.data()! : {};
+        
+        topSubmissions.push({
+            userId: submissionData.userId,
+            displayName: userData.displayName || 'Student',
+            email: userData.email || '',
+            photoURL: userData.photoURL,
+            pointsEarned: submissionData.pointsEarned,
+            timeSpent: submissionData.timeSpent,
+            submittedAt: submissionData.submittedAt?.toDate() || new Date(),
+            hintsUsed: submissionData.hintsUsed
+        });
+    }
+    
+    return {
+        challengeId,
+        challengeTitle: challengeData.title,
+        topSubmissions
+    };
+};
+
+export const subscribeToStudentLeaderboard = (callback: (leaderboard: StudentLeaderboardEntry[]) => void, limit: number = 10): (() => void) => {
+    if (!isFirebaseConfigured || !db) {
+        console.error(CONFIG_ERROR_MESSAGE);
+        return () => {};
+    }
+    
+    // Subscribe to challenge submissions changes to update leaderboard
+    return db.collection('challengeSubmissions')
+        .onSnapshot(async () => {
+            try {
+                const leaderboard = await getStudentLeaderboard(limit);
+                callback(leaderboard);
+            } catch (error) {
+                console.error('Error updating leaderboard:', error);
+            }
+        });
 };

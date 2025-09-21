@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import type { User, LearningPlan, Module, Lesson, Student } from './types';
-import { onAuthStateChanged, logout, getLearningPlan, saveLearningPlan, updateLessonInDb, getStudents } from './services/firebaseService';
+import type { User, LearningPlan, Module, Lesson, Student, Collaborator, CollaboratorPermission, StudyMaterial, Challenge, ChallengeSubmission } from './types';
+import { onAuthStateChanged, logout, getLearningPlan, saveLearningPlan, updateLessonInDb, getStudents, addStudyMaterial, updateStudyMaterial, deleteStudyMaterial, subscribeToStudyMaterials, addChallenge, submitChallengeAnswer, getUserChallengeStats, getStudentLeaderboard } from './services/firebaseService';
 import { generateLearningPlan } from './services/geminiService';
 import { isFirebaseConfigured } from './services/firebaseConfig';
 
@@ -19,8 +19,10 @@ import NotesView from './components/NotesView';
 import ChallengeArena from './components/ChallengeArena';
 import DatabaseInspectorModal from './components/DatabaseInspectorModal';
 import ConfigErrorScreen from './components/ConfigErrorScreen';
+import StudyMaterialsView from './components/StudyMaterialsView';
+import StudyMaterialsModal from './components/StudyMaterialsModal';
 
-type AppView = 'login' | 'welcome' | 'generating' | 'student_dashboard' | 'module_view' | 'notes_view' | 'challenge_arena' | 'teacher_dashboard' | 'student_progress_view';
+type AppView = 'login' | 'welcome' | 'generating' | 'student_dashboard' | 'module_view' | 'notes_view' | 'challenge_arena' | 'study_materials_view' | 'teacher_dashboard' | 'student_progress_view';
 
 const App: React.FC = () => {
     // Core State
@@ -42,7 +44,21 @@ const App: React.FC = () => {
     // Teacher-specific State
     const [students, setStudents] = useState<Student[]>([]);
     const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
-    const [collaborators, setCollaborators] = useState<string[]>(['teacher.collaborator@example.com']);
+    const [collaborators, setCollaborators] = useState<Collaborator[]>([
+        {
+            email: 'teacher.collaborator@example.com',
+            permission: 'viewer',
+            invitedAt: new Date(),
+            invitedBy: 'system'
+        }
+    ]);
+
+    // Study Materials State
+    const [studyMaterials, setStudyMaterials] = useState<StudyMaterial[]>([]);
+    const [isStudyMaterialsModalOpen, setIsStudyMaterialsModalOpen] = useState(false);
+    const [challenges, setChallenges] = useState<Challenge[]>([]);
+    const [challengeSubmissions, setChallengeSubmissions] = useState<ChallengeSubmission[]>([]);
+    const [leaderboard, setLeaderboard] = useState<any[]>([]);
 
     // Effect for handling authentication and data fetching
     useEffect(() => {
@@ -80,6 +96,20 @@ const App: React.FC = () => {
         });
         return () => unsubscribe();
     }, [isConfigError]);
+
+    // Effect for subscribing to study materials
+    useEffect(() => {
+        if (!user) {
+            setStudyMaterials([]);
+            return;
+        }
+
+        const unsubscribe = subscribeToStudyMaterials((materials) => {
+            setStudyMaterials(materials);
+        });
+
+        return () => unsubscribe();
+    }, [user]);
 
     const handleStartPlan = async (studentNeeds: string, level: string) => {
         if (!user) return;
@@ -138,6 +168,82 @@ const App: React.FC = () => {
         setLearningPlan(null);
     };
 
+    const handleInviteCollaborator = (email: string, permission: CollaboratorPermission) => {
+        const newCollaborator: Collaborator = {
+            email,
+            permission,
+            invitedAt: new Date(),
+            invitedBy: user?.email || 'unknown'
+        };
+        setCollaborators(prev => [...prev, newCollaborator]);
+    };
+
+    const handleRemoveCollaborator = (email: string) => {
+        setCollaborators(prev => prev.filter(c => c.email !== email));
+    };
+
+    const handleUpdateCollaboratorPermission = (email: string, permission: CollaboratorPermission) => {
+        setCollaborators(prev => prev.map(c => 
+            c.email === email ? { ...c, permission } : c
+        ));
+    };
+
+    // Study Materials Handlers
+    const handleAddStudyMaterial = async (material: Omit<StudyMaterial, 'id' | 'createdAt'>) => {
+        try {
+            await addStudyMaterial(material);
+        } catch (error) {
+            console.error('Error adding study material:', error);
+            alert('Error adding study material. Please try again.');
+        }
+    };
+
+    const handleUpdateStudyMaterial = async (id: string, updates: Partial<StudyMaterial>) => {
+        try {
+            await updateStudyMaterial(id, updates);
+        } catch (error) {
+            console.error('Error updating study material:', error);
+            alert('Error updating study material. Please try again.');
+        }
+    };
+
+    const handleDeleteStudyMaterial = async (id: string) => {
+        try {
+            await deleteStudyMaterial(id);
+        } catch (error) {
+            console.error('Error deleting study material:', error);
+            alert('Error deleting study material. Please try again.');
+        }
+    };
+
+    // Challenge handlers
+    const handleAddChallenge = async (challenge: Omit<Challenge, 'id' | 'createdAt'>) => {
+        try {
+            await addChallenge(challenge);
+        } catch (error) {
+            console.error('Error adding challenge:', error);
+            alert('Error adding challenge. Please try again.');
+        }
+    };
+
+    const handleSubmitChallengeAnswer = async (submission: Omit<ChallengeSubmission, 'id' | 'submittedAt'>) => {
+        try {
+            await submitChallengeAnswer(submission);
+        } catch (error) {
+            console.error('Error submitting challenge answer:', error);
+            alert('Error submitting answer. Please try again.');
+        }
+    };
+
+    const loadLeaderboard = async () => {
+        try {
+            const leaderboardData = await getStudentLeaderboard(10);
+            setLeaderboard(leaderboardData);
+        } catch (error) {
+            console.error('Error loading leaderboard:', error);
+        }
+    };
+
     const renderContent = () => {
         if (isConfigError) return <ConfigErrorScreen />;
         if (isLoading) return <Loader message="Initializing..." />;
@@ -156,6 +262,7 @@ const App: React.FC = () => {
                     onSelectModule={module => { setSelectedModule(module); setView('module_view'); }}
                     onViewNotes={() => setView('notes_view')}
                     onViewChallenges={() => setView('challenge_arena')}
+                    onViewStudyMaterials={() => setView('study_materials_view')}
                     isPortugueseHelpVisible={isPortugueseHelpVisible}
                 />;
             case 'module_view':
@@ -174,8 +281,15 @@ const App: React.FC = () => {
                     onBack={() => setView('student_dashboard')}
                     isPortugueseHelpVisible={isPortugueseHelpVisible}
                  />;
-            case 'challenge_arena':
-                 return <ChallengeArena 
+        case 'challenge_arena':
+            return <ChallengeArena 
+                onBack={() => setView('student_dashboard')}
+                isPortugueseHelpVisible={isPortugueseHelpVisible}
+                currentUser={user}
+            />;
+            case 'study_materials_view':
+                 return <StudyMaterialsView 
+                    studyMaterials={studyMaterials}
                     onBack={() => setView('student_dashboard')}
                     isPortugueseHelpVisible={isPortugueseHelpVisible}
                  />;
@@ -184,9 +298,12 @@ const App: React.FC = () => {
                     students={students}
                     onSelectStudent={student => { setSelectedStudent(student); setView('student_progress_view'); }}
                     collaborators={collaborators}
-                    onInviteCollaborator={email => setCollaborators(prev => [...prev, email])}
-                    onRemoveCollaborator={email => setCollaborators(prev => prev.filter(c => c !== email))}
+                    onInviteCollaborator={handleInviteCollaborator}
+                    onRemoveCollaborator={handleRemoveCollaborator}
+                    onUpdateCollaboratorPermission={handleUpdateCollaboratorPermission}
+                    onOpenStudyMaterials={() => setIsStudyMaterialsModalOpen(true)}
                     isPortugueseHelpVisible={isPortugueseHelpVisible}
+                    currentUser={user}
                 />;
             case 'student_progress_view':
                 if (!selectedStudent) return null; // Or error
@@ -225,8 +342,20 @@ const App: React.FC = () => {
                 onClose={() => setIsDbInspectorOpen(false)}
                 learningPlan={learningPlan}
                 students={students}
-                collaborators={collaborators}
+                collaborators={collaborators.map(c => c.email)}
             />
+            {user && user.role === 'teacher' && (
+                <StudyMaterialsModal
+                    isOpen={isStudyMaterialsModalOpen}
+                    onClose={() => setIsStudyMaterialsModalOpen(false)}
+                    studyMaterials={studyMaterials}
+                    onAddMaterial={handleAddStudyMaterial}
+                    onUpdateMaterial={handleUpdateStudyMaterial}
+                    onDeleteMaterial={handleDeleteStudyMaterial}
+                    isPortugueseHelpVisible={isPortugueseHelpVisible}
+                    currentUserEmail={user.email}
+                />
+            )}
         </div>
     );
 };
