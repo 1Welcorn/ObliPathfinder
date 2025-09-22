@@ -22,8 +22,10 @@ import ConfigErrorScreen from './components/ConfigErrorScreen';
 import StudyMaterialsView from './components/StudyMaterialsView';
 import StudyMaterialsModal from './components/StudyMaterialsModal';
 import OBLIAI from './components/OBLIAI';
+import ProgressDashboard from './components/ProgressDashboard';
+import TeacherProgressView from './components/TeacherProgressView';
 
-type AppView = 'login' | 'welcome' | 'generating' | 'student_dashboard' | 'module_view' | 'notes_view' | 'challenge_arena' | 'study_materials_view' | 'obli_ai' | 'teacher_dashboard' | 'student_progress_view';
+type AppView = 'login' | 'welcome' | 'generating' | 'student_dashboard' | 'module_view' | 'notes_view' | 'challenge_arena' | 'study_materials_view' | 'obli_ai' | 'teacher_dashboard' | 'student_progress_view' | 'progress_dashboard' | 'teacher_progress_view';
 
 const App: React.FC = () => {
     // Core State
@@ -189,6 +191,19 @@ const App: React.FC = () => {
         ));
     };
 
+    const handleDeleteStudent = (student: Student) => {
+        // Remove student from the local state
+        setStudents(prev => prev.filter(s => s.uid !== student.uid));
+        
+        // If the deleted student was selected, clear the selection
+        if (selectedStudent && selectedStudent.uid === student.uid) {
+            setSelectedStudent(null);
+        }
+        
+        // TODO: In a real app, you would also delete the student from Firebase here
+        console.log(`Student ${student.name} deleted from local state. Firebase deletion not implemented yet.`);
+    };
+
     // Study Materials Handlers
     const handleAddStudyMaterial = async (material: Omit<StudyMaterial, 'id' | 'createdAt'>) => {
         try {
@@ -281,6 +296,7 @@ const App: React.FC = () => {
                     plan={learningPlan}
                     onBack={() => setView('student_dashboard')}
                     isPortugueseHelpVisible={isPortugueseHelpVisible}
+                    currentUser={user}
                  />;
         case 'challenge_arena':
             console.log('Rendering ChallengeArena with user:', user);
@@ -295,6 +311,7 @@ const App: React.FC = () => {
                     onBack={() => setView('student_dashboard')}
                     isPortugueseHelpVisible={isPortugueseHelpVisible}
                     onOpenOBLIAI={() => setView('obli_ai')}
+                    currentUser={user}
                  />;
             case 'obli_ai':
                 return <OBLIAI
@@ -306,11 +323,13 @@ const App: React.FC = () => {
                 return <TeacherDashboard
                     students={students}
                     onSelectStudent={student => { setSelectedStudent(student); setView('student_progress_view'); }}
+                    onDeleteStudent={handleDeleteStudent}
                     collaborators={collaborators}
                     onInviteCollaborator={handleInviteCollaborator}
                     onRemoveCollaborator={handleRemoveCollaborator}
                     onUpdateCollaboratorPermission={handleUpdateCollaboratorPermission}
                     onOpenStudyMaterials={() => setIsStudyMaterialsModalOpen(true)}
+                    onViewProgress={() => setView('teacher_progress_view')}
                     isPortugueseHelpVisible={isPortugueseHelpVisible}
                     currentUser={user}
                 />;
@@ -320,7 +339,17 @@ const App: React.FC = () => {
                     student={selectedStudent}
                     onBack={() => { setSelectedStudent(null); setView('teacher_dashboard'); }}
                     isPortugueseHelpVisible={isPortugueseHelpVisible}
-                />
+                />;
+            case 'progress_dashboard':
+                return <ProgressDashboard
+                    onBack={() => setView('student_dashboard')}
+                    currentUser={user}
+                />;
+            case 'teacher_progress_view':
+                return <TeacherProgressView
+                    onBack={() => setView('teacher_dashboard')}
+                    currentUser={user}
+                />;
             default:
                 return <div>Something went wrong.</div>;
         }
@@ -334,6 +363,7 @@ const App: React.FC = () => {
                 isPortugueseHelpVisible={isPortugueseHelpVisible}
                 onTogglePortugueseHelp={() => setIsPortugueseHelpVisible(prev => !prev)}
                 onOpenDatabaseInspector={() => setIsDbInspectorOpen(true)}
+                learningPlan={learningPlan}
             />
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                 {renderContent()}

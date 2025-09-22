@@ -78,6 +78,17 @@ export interface StudyMaterial {
     createdAt: Date;
     createdBy: string;
     tags: string[];
+    level?: 'junior' | 'level1' | 'level2' | 'upper' | 'all';
+}
+
+export interface MaterialNote {
+    id: string;
+    materialId: string;
+    materialTitle: string;
+    content: string;
+    userId: string;
+    createdAt: Date;
+    updatedAt: Date;
 }
 
 export type ChallengeType = 'riddle' | 'word_hunt' | 'enigmas' | 'logic_puzzle' | 'word_play' | 'math_challenge' | 'trivia';
@@ -137,4 +148,42 @@ export interface ChallengeLeaderboard {
         submittedAt: Date;
         hintsUsed: number;
     }>;
+}
+
+// Learning Progress Tracking Types
+export interface LearningProgress {
+    userId: string;
+    lastSessionId: string;
+    lastSessionDate: Date;
+    totalSessions: number;
+    totalMessages: number;
+    topicsLearned: string[];
+    currentTopics: string[];
+    learningStreak: number;
+    lastActivity: Date;
+    sessionHistory: SessionSummary[];
+    learningGoals: string[];
+    achievements: string[];
+}
+
+export interface SessionSummary {
+    sessionId: string;
+    date: Date;
+    duration: number; // in minutes
+    topics: string[];
+    messagesCount: number;
+    keyLearnings: string[];
+    nextSteps: string[];
+}
+
+export interface LearningMemory {
+    userId: string;
+    lastMessage: string;
+    conversationContext: string;
+    currentTopic: string;
+    learningLevel: 'beginner' | 'intermediate' | 'advanced';
+    interests: string[];
+    strengths: string[];
+    areasToImprove: string[];
+    lastSessionSummary: string;
 }

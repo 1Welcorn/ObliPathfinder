@@ -9,23 +9,37 @@ import { BookOpenIcon } from './icons/BookOpenIcon';
 import { ClockIcon } from './icons/ClockIcon';
 import { CheckCircleIcon } from './icons/CheckCircleIcon';
 import { TrophyIcon } from './icons/TrophyIcon';
-import type { StudyMaterial, StudyMaterialType } from '../types';
+import { MaterialNotePopup } from './MaterialNotePopup';
+import type { StudyMaterial, StudyMaterialType, MaterialNote, User } from '../types';
+import { getNotesForMaterial, saveNote, deleteNote, getNotesCountForMaterial } from '../services/notesService';
 
 interface StudyMaterialsViewProps {
     studyMaterials: StudyMaterial[];
     onBack: () => void;
     isPortugueseHelpVisible: boolean;
     onOpenOBLIAI: () => void;
+    currentUser: User | null;
 }
 
 const StudyMaterialsView: React.FC<StudyMaterialsViewProps> = ({
     studyMaterials,
     onBack,
     isPortugueseHelpVisible,
-    onOpenOBLIAI
+    onOpenOBLIAI,
+    currentUser
 }) => {
     const [selectedType, setSelectedType] = useState<StudyMaterialType | 'all'>('all');
     const [searchTerm, setSearchTerm] = useState('');
+    const [notePopup, setNotePopup] = useState<{
+        isOpen: boolean;
+        materialId: string;
+        materialTitle: string;
+        existingNote?: MaterialNote;
+    }>({
+        isOpen: false,
+        materialId: '',
+        materialTitle: ''
+    });
 
     const getTypeIcon = (type: StudyMaterialType) => {
         switch (type) {
@@ -50,6 +64,28 @@ const StudyMaterialsView: React.FC<StudyMaterialsViewProps> = ({
             case 'assignment': return 'text-indigo-600 bg-indigo-100 border-indigo-200';
             case 'past_exam': return 'text-yellow-600 bg-yellow-100 border-yellow-200';
             default: return 'text-gray-600 bg-gray-100 border-gray-200';
+        }
+    };
+
+    const getLevelLabel = (level?: string) => {
+        switch (level) {
+            case 'junior': return 'Junior';
+            case 'level1': return 'Level 1';
+            case 'level2': return 'Level 2';
+            case 'upper': return 'Upper/Free';
+            case 'all': return 'All Levels';
+            default: return 'All Levels';
+        }
+    };
+
+    const getLevelColor = (level?: string) => {
+        switch (level) {
+            case 'junior': return 'text-green-600 bg-green-100';
+            case 'level1': return 'text-blue-600 bg-blue-100';
+            case 'level2': return 'text-purple-600 bg-purple-100';
+            case 'upper': return 'text-orange-600 bg-orange-100';
+            case 'all': return 'text-gray-600 bg-gray-100';
+            default: return 'text-gray-600 bg-gray-100';
         }
     };
 
@@ -86,6 +122,36 @@ const StudyMaterialsView: React.FC<StudyMaterialsViewProps> = ({
         const threeDaysFromNow = new Date();
         threeDaysFromNow.setDate(threeDaysFromNow.getDate() + 3);
         return new Date() <= dueDate && dueDate <= threeDaysFromNow;
+    };
+
+    // Note handling functions
+    const handleOpenNote = (materialId: string, materialTitle: string) => {
+        if (!currentUser) return;
+        
+        const existingNote = getNotesForMaterial(materialId, currentUser.uid)[0];
+        setNotePopup({
+            isOpen: true,
+            materialId,
+            materialTitle,
+            existingNote
+        });
+    };
+
+    const handleSaveNote = async (noteData: Omit<MaterialNote, 'id' | 'createdAt' | 'updatedAt'>) => {
+        if (!currentUser) return;
+        
+        await saveNote(noteData, currentUser.uid);
+        setNotePopup({ isOpen: false, materialId: '', materialTitle: '' });
+    };
+
+    const handleDeleteNote = async (noteId: string) => {
+        if (!currentUser) return;
+        
+        await deleteNote(noteId, currentUser.uid);
+    };
+
+    const handleCloseNote = () => {
+        setNotePopup({ isOpen: false, materialId: '', materialTitle: '' });
     };
 
     return (
@@ -241,6 +307,19 @@ const StudyMaterialsView: React.FC<StudyMaterialsViewProps> = ({
                                                         </div>
                                                     </div>
                                                     <div className="flex items-center gap-2">
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleOpenNote(material.id, material.title);
+                                                            }}
+                                                            className="p-2 bg-indigo-100 text-indigo-600 rounded-lg hover:bg-indigo-200 transition-colors"
+                                                            title="Add Note"
+                                                        >
+                                                            <DocumentTextIcon className="h-4 w-4" />
+                                                        </button>
+                                                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getLevelColor(material.level)}`}>
+                                                            {getLevelLabel(material.level)}
+                                                        </span>
                                                         {material.isRequired && (
                                                             <span className="px-2 py-1 bg-red-100 text-red-600 text-xs font-semibold rounded-full">
                                                                 Required
@@ -344,6 +423,19 @@ const StudyMaterialsView: React.FC<StudyMaterialsViewProps> = ({
                                                         </div>
                                                     </div>
                                                     <div className="flex items-center gap-2">
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleOpenNote(material.id, material.title);
+                                                            }}
+                                                            className="p-2 bg-indigo-100 text-indigo-600 rounded-lg hover:bg-indigo-200 transition-colors"
+                                                            title="Add Note"
+                                                        >
+                                                            <DocumentTextIcon className="h-4 w-4" />
+                                                        </button>
+                                                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getLevelColor(material.level)}`}>
+                                                            {getLevelLabel(material.level)}
+                                                        </span>
                                                         {material.isRequired && (
                                                             <span className="px-2 py-1 bg-red-100 text-red-600 text-xs font-semibold rounded-full">
                                                                 Required
@@ -429,6 +521,18 @@ const StudyMaterialsView: React.FC<StudyMaterialsViewProps> = ({
                     </div>
                 </div>
             </div>
+
+            {/* Material Note Popup */}
+            <MaterialNotePopup
+                isOpen={notePopup.isOpen}
+                onClose={handleCloseNote}
+                materialId={notePopup.materialId}
+                materialTitle={notePopup.materialTitle}
+                userId={currentUser?.uid || ''}
+                existingNote={notePopup.existingNote}
+                onSaveNote={handleSaveNote}
+                onDeleteNote={handleDeleteNote}
+            />
         </div>
     );
 };

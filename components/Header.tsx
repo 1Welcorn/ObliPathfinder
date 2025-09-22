@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import type { User } from '../types';
+import type { User, LearningPlan } from '../types';
 import { GraduationCapIcon } from './icons/GraduationCapIcon';
 import { UsersIcon } from './icons/UsersIcon';
 import { ArrowRightOnRectangleIcon } from './icons/ArrowRightOnRectangleIcon';
 import { LightBulbIcon } from './icons/LightBulbIcon';
 import { DatabaseIcon } from './icons/DatabaseIcon';
+import { CourseRoadmap } from './CourseRoadmap';
 import { setMainTeacher } from '../services/firebaseService';
 
 interface HeaderProps {
@@ -13,20 +14,21 @@ interface HeaderProps {
     isPortugueseHelpVisible: boolean;
     onTogglePortugueseHelp: () => void;
     onOpenDatabaseInspector: () => void;
+    learningPlan: LearningPlan | null;
 }
 
-const Header: React.FC<HeaderProps> = ({ user, onLogout, isPortugueseHelpVisible, onTogglePortugueseHelp, onOpenDatabaseInspector }) => {
+const Header: React.FC<HeaderProps> = ({ user, onLogout, isPortugueseHelpVisible, onTogglePortugueseHelp, onOpenDatabaseInspector, learningPlan }) => {
     const [isSettingMainTeacher, setIsSettingMainTeacher] = useState(false);
-    const [isUserInfoExpanded, setIsUserInfoExpanded] = useState(false);
+    const [isRoadmapOpen, setIsRoadmapOpen] = useState(false);
     const roleText = user?.role === 'student' ? 'Student View' : 'Teacher View';
     const RoleIcon = user?.role === 'student' ? GraduationCapIcon : UsersIcon;
 
     const handleSetMainTeacher = async () => {
-        if (!user?.email) return;
         setIsSettingMainTeacher(true);
         try {
-            await setMainTeacher(user.email);
-            alert('You are now set as the main teacher! Please refresh the page.');
+            // Set the specific email as main teacher
+            await setMainTeacher('f4330252301@gmail.com');
+            alert('f4330252301@gmail.com is now set as the main teacher! Please refresh the page.');
         } catch (error) {
             console.error('Error setting main teacher:', error);
             alert('Error setting main teacher. Please try again.');
@@ -59,28 +61,13 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, isPortugueseHelpVisible
                                     <div className="w-px h-6 bg-slate-300 mx-2 hidden sm:block"></div>
                                     
                                     <button
-                                        onClick={() => setIsUserInfoExpanded(!isUserInfoExpanded)}
-                                        className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-200 ${isUserInfoExpanded ? 'bg-green-100 text-green-700' : 'text-slate-600 hover:bg-slate-100'}`}
-                                        title={isUserInfoExpanded ? 'Click to hide user info' : 'Click to show user info'}
+                                        onClick={() => setIsRoadmapOpen(true)}
+                                        className="flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-200 text-slate-600 hover:bg-slate-100"
+                                        title="Click to view course roadmap"
                                     >
                                         <RoleIcon className="h-6 w-6" />
-                                        <span className="font-semibold">{roleText}</span>
+                                        <span className="font-semibold">{user?.role === 'student' ? 'Course Roadmap' : roleText}</span>
                                     </button>
-                                    
-                                    {isUserInfoExpanded && (
-                                        <div className="absolute top-16 left-4 bg-white border border-slate-200 rounded-lg shadow-lg p-3 z-50">
-                                            <div className="text-sm">
-                                                <div className="font-semibold text-slate-800 mb-1">User Information</div>
-                                                <div className="text-slate-600">
-                                                    <div><span className="font-medium">Email:</span> {user.email}</div>
-                                                    <div><span className="font-medium">Role:</span> {user.role}</div>
-                                                    {user.displayName && (
-                                                        <div><span className="font-medium">Name:</span> {user.displayName}</div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
                                 </>
                             )}
                         </div>
@@ -107,13 +94,13 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, isPortugueseHelpVisible
                                 <DatabaseIcon className="h-5 w-5" />
                             </button>
 
-                            {/* Temporary admin button - only show for teachers who aren't main teacher yet */}
+                            {/* Admin button to set f4330252301@gmail.com as main teacher */}
                             {user && user.role === 'teacher' && !user.isMainTeacher && (
                                 <button
                                     onClick={handleSetMainTeacher}
                                     disabled={isSettingMainTeacher}
                                     className="px-3 py-2 rounded-md text-sm font-semibold bg-amber-100 text-amber-700 hover:bg-amber-200 transition-colors disabled:opacity-50"
-                                    title="Set yourself as main teacher (admin access)"
+                                    title="Set f4330252301@gmail.com as main teacher (admin access)"
                                 >
                                     {isSettingMainTeacher ? 'Setting...' : 'Set Main Teacher'}
                                 </button>
@@ -163,6 +150,14 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, isPortugueseHelpVisible
                     </div>
                 </div>
             )}
+
+            {/* Course Roadmap Modal */}
+            <CourseRoadmap
+                isOpen={isRoadmapOpen}
+                onClose={() => setIsRoadmapOpen(false)}
+                learningPlan={learningPlan}
+                isPortugueseHelpVisible={isPortugueseHelpVisible}
+            />
         </>
     );
 };

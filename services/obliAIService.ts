@@ -5,8 +5,33 @@ import { sshGeminiService, createSSHGeminiService, defaultSSHConfig } from './ss
 const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY || 'your-api-key-here');
 const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
-// Use SSH service if configured, otherwise fallback to direct API
-const useSSHIntegration = import.meta.env.VITE_USE_SSH_GEMINI === 'true';
+// Check if SSH configuration is available in localStorage
+const getSSHConfig = () => {
+    try {
+        const savedConfig = localStorage.getItem('sshGeminiConfig');
+        console.log('🔍 Checking localStorage for SSH config:', savedConfig);
+        return savedConfig ? JSON.parse(savedConfig) : null;
+    } catch (error) {
+        console.error('❌ Error loading SSH config:', error);
+        return null;
+    }
+};
+
+// Check if SSH integration should be used (dynamic check)
+const shouldUseSSHIntegration = () => {
+    const envFlag = import.meta.env.VITE_USE_SSH_GEMINI === 'true';
+    const savedConfig = getSSHConfig() !== null;
+    const shouldUse = envFlag || savedConfig;
+    
+    console.log('🔍 SSH Integration Check:', {
+        envFlag,
+        savedConfig,
+        shouldUse,
+        config: getSSHConfig()
+    });
+    
+    return shouldUse;
+};
 
 export interface ChatMessage {
     id: string;
@@ -43,9 +68,12 @@ class OBLIAIService {
     // Initialize a new study session
     async startStudySession(userId: string, subject: string, difficulty: 'beginner' | 'intermediate' | 'advanced'): Promise<StudySession> {
         // Use SSH service if configured
-        if (useSSHIntegration) {
+        if (shouldUseSSHIntegration()) {
+            console.log('🚀 Using SSH service for study session');
             return await sshGeminiService.startStudySession(userId, subject, difficulty);
         }
+        
+        console.log('📚 Using default Gemini API for study session');
 
         const session: StudySession = {
             id: `session_${Date.now()}`,
@@ -68,9 +96,12 @@ class OBLIAIService {
     // Send a message to the AI and get response
     async sendMessage(message: string, context?: string): Promise<ChatMessage> {
         // Use SSH service if configured
-        if (useSSHIntegration) {
+        if (shouldUseSSHIntegration()) {
+            console.log('🚀 Using SSH service for message:', message);
             return await sshGeminiService.sendMessage(message, context);
         }
+        
+        console.log('📚 Using default Gemini API for message:', message);
 
         if (!this.currentSession) {
             throw new Error('No active study session');
@@ -186,7 +217,7 @@ Como posso ajudá-lo hoje? Faça uma pergunta ou me diga o que gostaria de estud
     // Get study recommendations
     async getStudyRecommendations(): Promise<StudyRecommendation[]> {
         // Use SSH service if configured
-        if (useSSHIntegration) {
+        if (shouldUseSSHIntegration()) {
             return await sshGeminiService.getStudyRecommendations();
         }
 
@@ -215,7 +246,7 @@ Como posso ajudá-lo hoje? Faça uma pergunta ou me diga o que gostaria de estud
     // End current study session
     endStudySession(): StudySession | null {
         // Use SSH service if configured
-        if (useSSHIntegration) {
+        if (shouldUseSSHIntegration()) {
             return sshGeminiService.endStudySession();
         }
 
@@ -231,7 +262,7 @@ Como posso ajudá-lo hoje? Faça uma pergunta ou me diga o que gostaria de estud
     // Get current session
     getCurrentSession(): StudySession | null {
         // Use SSH service if configured
-        if (useSSHIntegration) {
+        if (shouldUseSSHIntegration()) {
             return sshGeminiService.getCurrentSession();
         }
         return this.currentSession;
