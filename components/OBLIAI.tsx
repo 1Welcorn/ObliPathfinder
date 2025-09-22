@@ -44,7 +44,8 @@ const OBLIAI: React.FC<OBLIAIProps> = ({ onBack, isPortugueseHelpVisible, curren
         try {
             const session = await obliAIService.startStudySession(
                 currentUser?.uid || 'anonymous',
-                'General'
+                'General',
+                'intermediate'
             );
             setCurrentSession(session);
             setMessages(session.messages);

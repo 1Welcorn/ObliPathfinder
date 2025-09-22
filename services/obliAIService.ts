@@ -70,7 +70,7 @@ class OBLIAIService {
         // Use SSH service if configured
         if (shouldUseSSHIntegration()) {
             console.log('🚀 Using SSH service for study session');
-            return await sshGeminiService.startStudySession(userId, subject, difficulty);
+            return await sshGeminiService.startStudySession(userId, subject);
         }
         
         console.log('📚 Using default Gemini API for study session');
@@ -244,10 +244,10 @@ Como posso ajudá-lo hoje? Faça uma pergunta ou me diga o que gostaria de estud
     }
 
     // End current study session
-    endStudySession(): StudySession | null {
+    async endStudySession(): Promise<StudySession | null> {
         // Use SSH service if configured
         if (shouldUseSSHIntegration()) {
-            return sshGeminiService.endStudySession();
+            return await sshGeminiService.endStudySession();
         }
 
         if (this.currentSession) {

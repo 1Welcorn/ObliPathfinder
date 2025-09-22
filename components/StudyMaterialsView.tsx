@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ArrowLeftIcon } from './icons/ArrowLeftIcon';
+import { ArrowRightIcon } from './icons/ArrowRightIcon';
 import { GlobeIcon } from './icons/GlobeIcon';
 import { DocumentTextIcon } from './icons/DocumentTextIcon';
 import { BeakerIcon } from './icons/BeakerIcon';
@@ -17,7 +18,6 @@ interface StudyMaterialsViewProps {
     studyMaterials: StudyMaterial[];
     onBack: () => void;
     isPortugueseHelpVisible: boolean;
-    onOpenOBLIAI: () => void;
     currentUser: User | null;
 }
 
@@ -25,7 +25,6 @@ const StudyMaterialsView: React.FC<StudyMaterialsViewProps> = ({
     studyMaterials,
     onBack,
     isPortugueseHelpVisible,
-    onOpenOBLIAI,
     currentUser
 }) => {
     const [selectedType, setSelectedType] = useState<StudyMaterialType | 'all'>('all');
@@ -89,12 +88,43 @@ const StudyMaterialsView: React.FC<StudyMaterialsViewProps> = ({
         }
     };
 
+    // Get the first two link materials to pin (sorted by creation date)
+    const linkMaterials = studyMaterials
+        .filter(material => material.type === 'link')
+        .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    
+    const pinnedMaterials = linkMaterials.slice(0, 2); // Pin first two links
+    
     const filteredMaterials = studyMaterials.filter(material => {
         const matchesType = selectedType === 'all' || material.type === selectedType;
         const matchesSearch = material.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                             material.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
                             material.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
         return matchesType && matchesSearch;
+    });
+
+    // Sort materials to pin the first two links at the top
+    const sortedMaterials = [...filteredMaterials].sort((a, b) => {
+        // If we have pinned materials and we're showing all materials or links
+        if (pinnedMaterials.length > 0 && (selectedType === 'all' || selectedType === 'link')) {
+            // Check if either material is pinned
+            const aIsPinned = pinnedMaterials.some(pinned => pinned.id === a.id);
+            const bIsPinned = pinnedMaterials.some(pinned => pinned.id === b.id);
+            
+            // If both are pinned, maintain their original order
+            if (aIsPinned && bIsPinned) {
+                const aIndex = pinnedMaterials.findIndex(pinned => pinned.id === a.id);
+                const bIndex = pinnedMaterials.findIndex(pinned => pinned.id === b.id);
+                return aIndex - bIndex;
+            }
+            
+            // If only one is pinned, put it first
+            if (aIsPinned && !bIsPinned) return -1;
+            if (!aIsPinned && bIsPinned) return 1;
+        }
+        
+        // Sort by creation date (newest first) for the rest
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
 
     const typeCounts = {
@@ -220,74 +250,26 @@ const StudyMaterialsView: React.FC<StudyMaterialsViewProps> = ({
                     </div>
 
                     <div className="lg:w-3/4">
-                        {/* OBLI A.I. Section */}
-                        <div className="mb-8">
-                            <div className="flex items-center gap-3 mb-4">
-                                <div className="text-3xl">🤖</div>
-                                <h2 className="text-2xl font-bold text-slate-800">OBLI A.I.</h2>
-                                <span className="px-3 py-1 bg-indigo-100 text-indigo-800 text-sm font-semibold rounded-full">
-                                    AI Assistant
-                                </span>
-                            </div>
-                            <div className="bg-gradient-to-r from-indigo-50 to-purple-50 p-6 rounded-xl border border-indigo-200">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <h3 className="text-xl font-bold text-slate-800 mb-2">
-                                            Seu Assistente de Estudos Inteligente
-                                        </h3>
-                                        <p className="text-slate-600 mb-4">
-                                            Converse com a IA para tirar dúvidas, obter explicações, dicas de estudo e muito mais!
-                                        </p>
-                                        {isPortugueseHelpVisible && (
-                                            <p className="text-sm text-slate-500 italic mb-4">
-                                                Chat with AI to ask questions, get explanations, study tips and much more!
-                                            </p>
-                                        )}
-                                        <div className="flex items-center gap-4 text-sm text-slate-600">
-                                            <span className="flex items-center gap-1">
-                                                <CheckCircleIcon className="h-4 w-4 text-green-500" />
-                                                Explicações personalizadas
-                                            </span>
-                                            <span className="flex items-center gap-1">
-                                                <CheckCircleIcon className="h-4 w-4 text-green-500" />
-                                                Dicas de estudo
-                                            </span>
-                                            <span className="flex items-center gap-1">
-                                                <CheckCircleIcon className="h-4 w-4 text-green-500" />
-                                                Suporte 24/7
-                                            </span>
-                                        </div>
-                                    </div>
-                                    <button
-                                        onClick={onOpenOBLIAI}
-                                        className="px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-2"
-                                    >
-                                        <div className="text-xl">🤖</div>
-                                        <span className="font-semibold">Iniciar Chat</span>
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
 
                         {/* Past Obli Exams Section */}
                         {studyMaterials.filter(m => m.type === 'past_exam').length > 0 && (
                             <div className="mb-8">
-                                <div className="flex items-center gap-3 mb-4">
+                                <div className="flex items-center gap-3 mb-6">
                                     <TrophyIcon className="h-8 w-8 text-yellow-600" />
                                     <h2 className="text-2xl font-bold text-slate-800">Past Obli Exams</h2>
                                     <span className="px-3 py-1 bg-yellow-100 text-yellow-800 text-sm font-semibold rounded-full">
                                         {studyMaterials.filter(m => m.type === 'past_exam').length} exam{studyMaterials.filter(m => m.type === 'past_exam').length !== 1 ? 's' : ''}
                                     </span>
                                 </div>
-                                <div className="grid gap-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                                     {studyMaterials
                                         .filter(m => m.type === 'past_exam')
                                         .map((material) => (
                                             <div
                                                 key={material.id}
-                                                className={`p-6 border-2 rounded-xl transition-all duration-200 ${
+                                                className={`group relative bg-white border-2 rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden ${
                                                     material.url
-                                                        ? 'cursor-pointer hover:shadow-lg hover:border-yellow-400'
+                                                        ? 'cursor-pointer hover:border-yellow-400 hover:-translate-y-1'
                                                         : 'border-slate-200'
                                                 } ${getTypeColor(material.type)}`}
                                                 onClick={() => material.url && handleMaterialClick(material)}
@@ -388,114 +370,165 @@ const StudyMaterialsView: React.FC<StudyMaterialsViewProps> = ({
                             </div>
                         )}
 
-                        {/* Other Study Materials Section */}
-                        {filteredMaterials.filter(m => m.type !== 'past_exam').length > 0 && (
+                        {/* Study Materials Grid */}
+                        {sortedMaterials.filter(m => m.type !== 'past_exam').length > 0 && (
                             <div>
-                                <div className="flex items-center gap-3 mb-4">
+                                <div className="flex items-center gap-3 mb-6">
                                     <BookOpenIcon className="h-6 w-6 text-slate-600" />
-                                    <h2 className="text-xl font-bold text-slate-800">Other Study Materials</h2>
+                                    <h2 className="text-xl font-bold text-slate-800">Study Materials</h2>
+                                    <span className="px-3 py-1 bg-slate-100 text-slate-600 text-sm font-semibold rounded-full">
+                                        {sortedMaterials.filter(m => m.type !== 'past_exam').length} material{sortedMaterials.filter(m => m.type !== 'past_exam').length !== 1 ? 's' : ''}
+                                    </span>
                                 </div>
-                                <div className="grid gap-4">
-                                    {filteredMaterials
+                                
+                                {/* Grid Layout for Materials */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                                    {sortedMaterials
                                         .filter(m => m.type !== 'past_exam')
                                         .map((material) => (
                                             <div
                                                 key={material.id}
-                                                className={`p-6 border-2 rounded-xl transition-all duration-200 ${
+                                                className={`group relative bg-white border-2 rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden ${
                                                     material.url
-                                                        ? 'cursor-pointer hover:shadow-lg hover:border-indigo-300'
+                                                        ? 'cursor-pointer hover:border-indigo-300 hover:-translate-y-1'
                                                         : 'border-slate-200'
-                                                } ${getTypeColor(material.type)}`}
+                                                } ${getTypeColor(material.type)} ${
+                                                    pinnedMaterials.some(pinned => pinned.id === material.id)
+                                                        ? 'ring-2 ring-indigo-200 bg-gradient-to-br from-indigo-50 to-white' 
+                                                        : ''
+                                                }`}
                                                 onClick={() => material.url && handleMaterialClick(material)}
                                             >
-                                                <div className="flex items-start justify-between mb-4">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className={`p-2 rounded-lg ${getTypeColor(material.type)}`}>
-                                                            {getTypeIcon(material.type)}
+                                                {/* Material Header */}
+                                                <div className="p-6 pb-4">
+                                                    <div className="flex items-start justify-between mb-4">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className={`p-3 rounded-xl shadow-sm ${getTypeColor(material.type)}`}>
+                                                                {getTypeIcon(material.type)}
+                                                            </div>
+                                                            <div className="flex-1 min-w-0">
+                                                                <h3 className="text-lg font-bold text-slate-800 truncate group-hover:text-indigo-600 transition-colors">
+                                                                    {material.title}
+                                                                </h3>
+                                                                <p className="text-sm text-slate-500 capitalize font-medium">
+                                                                    {material.type.replace('_', ' ')}
+                                                                </p>
+                                                            </div>
                                                         </div>
-                                                        <div>
-                                                            <h3 className="text-lg font-bold text-slate-800">
-                                                                {material.title}
-                                                            </h3>
-                                                            <p className="text-sm text-slate-600 capitalize">
-                                                                {material.type}
-                                                            </p>
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex items-center gap-2">
+                                                        
+                                                        {/* Action Button */}
                                                         <button
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
                                                                 handleOpenNote(material.id, material.title);
                                                             }}
-                                                            className="p-2 bg-indigo-100 text-indigo-600 rounded-lg hover:bg-indigo-200 transition-colors"
+                                                            className="p-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-indigo-100 hover:text-indigo-600 transition-colors opacity-0 group-hover:opacity-100"
                                                             title="Add Note"
                                                         >
                                                             <DocumentTextIcon className="h-4 w-4" />
                                                         </button>
-                                                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getLevelColor(material.level)}`}>
+                                                    </div>
+
+                                                    {/* Description */}
+                                                    <p className="text-slate-700 text-sm leading-relaxed mb-4 line-clamp-3">
+                                                        {material.description}
+                                                    </p>
+
+                                                    {/* Badges Row */}
+                                                    <div className="flex flex-wrap gap-2 mb-4">
+                                                        {pinnedMaterials.some(pinned => pinned.id === material.id) && (
+                                                            <span className="px-3 py-1 bg-indigo-100 text-indigo-600 text-xs font-semibold rounded-full flex items-center gap-1">
+                                                                📌 PINNED #{pinnedMaterials.findIndex(pinned => pinned.id === material.id) + 1}
+                                                            </span>
+                                                        )}
+                                                        <span className={`px-3 py-1 text-xs font-semibold rounded-full ${getLevelColor(material.level)}`}>
                                                             {getLevelLabel(material.level)}
                                                         </span>
                                                         {material.isRequired && (
-                                                            <span className="px-2 py-1 bg-red-100 text-red-600 text-xs font-semibold rounded-full">
+                                                            <span className="px-3 py-1 bg-red-100 text-red-600 text-xs font-semibold rounded-full">
                                                                 Required
                                                             </span>
                                                         )}
                                                         {material.points && (
-                                                            <span className="px-2 py-1 bg-yellow-100 text-yellow-600 text-xs font-semibold rounded-full">
+                                                            <span className="px-3 py-1 bg-yellow-100 text-yellow-600 text-xs font-semibold rounded-full">
                                                                 {material.points} pts
                                                             </span>
                                                         )}
                                                     </div>
+
+                                                    {/* Due Date */}
+                                                    {material.dueDate && (
+                                                        <div className="flex items-center gap-2 mb-4">
+                                                            <ClockIcon className={`h-4 w-4 ${
+                                                                isOverdue(material.dueDate)
+                                                                    ? 'text-red-500'
+                                                                    : isDueSoon(material.dueDate)
+                                                                    ? 'text-yellow-500'
+                                                                    : 'text-slate-400'
+                                                            }`} />
+                                                            <span className={`text-sm font-medium ${
+                                                                isOverdue(material.dueDate)
+                                                                    ? 'text-red-600'
+                                                                    : isDueSoon(material.dueDate)
+                                                                    ? 'text-yellow-600'
+                                                                    : 'text-slate-600'
+                                                            }`}>
+                                                                Due: {material.dueDate.toLocaleDateString()}
+                                                                {isOverdue(material.dueDate) && ' (Overdue)'}
+                                                                {isDueSoon(material.dueDate) && !isOverdue(material.dueDate) && ' (Due Soon)'}
+                                                            </span>
+                                                        </div>
+                                                    )}
+
+                                                    {/* Tags */}
+                                                    {material.tags.length > 0 && (
+                                                        <div className="flex flex-wrap gap-1 mb-4">
+                                                            {material.tags.slice(0, 3).map((tag, tagIndex) => (
+                                                                <span
+                                                                    key={tagIndex}
+                                                                    className="px-2 py-1 bg-slate-100 text-slate-600 text-xs rounded-md"
+                                                                >
+                                                                    {tag}
+                                                                </span>
+                                                            ))}
+                                                            {material.tags.length > 3 && (
+                                                                <span className="px-2 py-1 bg-slate-100 text-slate-500 text-xs rounded-md">
+                                                                    +{material.tags.length - 3} more
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    )}
                                                 </div>
 
-                                                <p className="text-slate-700 mb-4">
-                                                    {material.description}
-                                                </p>
+                                                {/* Material Footer */}
+                                                <div className="px-6 py-4 bg-slate-50 border-t border-slate-200">
+                                                    {material.url ? (
+                                                        <div className="flex items-center justify-between">
+                                                            <div className="flex items-center gap-2 text-sm text-slate-600">
+                                                                <GlobeIcon className="h-4 w-4" />
+                                                                <span>Click to open</span>
+                                                            </div>
+                                                            <div className="text-indigo-600 group-hover:text-indigo-700 transition-colors">
+                                                                <ArrowRightIcon className="h-4 w-4" />
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="flex items-center gap-2 text-sm text-slate-500">
+                                                            <DocumentTextIcon className="h-4 w-4" />
+                                                            <span>No link available</span>
+                                                        </div>
+                                                    )}
+                                                </div>
 
+                                                {/* Content Preview (if available) */}
                                                 {material.content && (
-                                                    <div className="bg-slate-50 p-4 rounded-lg mb-4">
-                                                        <h4 className="font-semibold text-slate-800 mb-2">Instructions:</h4>
-                                                        <p className="text-slate-700 whitespace-pre-wrap">
-                                                            {material.content}
-                                                        </p>
-                                                    </div>
-                                                )}
-
-                                                {material.dueDate && (
-                                                    <div className="flex items-center gap-2 mb-4">
-                                                        <ClockIcon className="h-4 w-4 text-slate-500" />
-                                                        <span className={`text-sm font-medium ${
-                                                            isOverdue(material.dueDate)
-                                                                ? 'text-red-600'
-                                                                : isDueSoon(material.dueDate)
-                                                                ? 'text-yellow-600'
-                                                                : 'text-slate-600'
-                                                        }`}>
-                                                            Due: {material.dueDate.toLocaleDateString()}
-                                                            {isOverdue(material.dueDate) && ' (Overdue)'}
-                                                            {isDueSoon(material.dueDate) && !isOverdue(material.dueDate) && ' (Due Soon)'}
-                                                        </span>
-                                                    </div>
-                                                )}
-
-                                                {material.tags.length > 0 && (
-                                                    <div className="flex flex-wrap gap-2 mb-4">
-                                                        {material.tags.map((tag, index) => (
-                                                            <span
-                                                                key={index}
-                                                                className="px-2 py-1 bg-slate-200 text-slate-600 text-xs rounded-full"
-                                                            >
-                                                                {tag}
-                                                            </span>
-                                                        ))}
-                                                    </div>
-                                                )}
-
-                                                {material.url && (
-                                                    <div className="flex items-center gap-2 text-sm text-slate-600">
-                                                        <GlobeIcon className="h-4 w-4" />
-                                                        <span>Click to open link</span>
+                                                    <div className="px-6 pb-4">
+                                                        <div className="bg-slate-50 p-3 rounded-lg">
+                                                            <h4 className="font-semibold text-slate-800 text-sm mb-1">Instructions:</h4>
+                                                            <p className="text-slate-700 text-xs leading-relaxed line-clamp-2">
+                                                                {material.content}
+                                                            </p>
+                                                        </div>
                                                     </div>
                                                 )}
                                             </div>
@@ -505,7 +538,7 @@ const StudyMaterialsView: React.FC<StudyMaterialsViewProps> = ({
                         )}
 
                         {/* No Materials Message */}
-                        {filteredMaterials.length === 0 && (
+                        {sortedMaterials.length === 0 && (
                             <div className="text-center py-12">
                                 <DocumentTextIcon className="h-16 w-16 mx-auto mb-4 text-slate-300" />
                                 <h3 className="text-lg font-semibold text-slate-600 mb-2">

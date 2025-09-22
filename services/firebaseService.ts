@@ -9,6 +9,9 @@ import type { User, UserRole, LearningPlan, Lesson, Student, StudyMaterial, Chal
 
 // FIX: Used firebase.auth for GoogleAuthProvider
 const provider = new firebase.auth.GoogleAuthProvider();
+// Add additional scopes if needed
+provider.addScope('email');
+provider.addScope('profile');
 const CONFIG_ERROR_MESSAGE = "Firebase is not configured correctly. Please check your environment variables.";
 
 // --- Authentication Service Functions ---
@@ -113,9 +116,23 @@ export const signInWithGoogle = async (role: UserRole): Promise<void> => {
                 });
             }
         }
-    } catch (error) {
+    } catch (error: any) {
         console.error("Error during Google Sign-In:", error);
-        throw error;
+        
+        // Provide more specific error messages
+        if (error.code === 'auth/popup-closed-by-user') {
+            throw new Error("Sign-in was cancelled. Please try again.");
+        } else if (error.code === 'auth/popup-blocked') {
+            throw new Error("Popup was blocked by your browser. Please allow popups for this site and try again.");
+        } else if (error.code === 'auth/network-request-failed') {
+            throw new Error("Network error. Please check your internet connection and try again.");
+        } else if (error.code === 'auth/too-many-requests') {
+            throw new Error("Too many failed attempts. Please try again later.");
+        } else if (error.message?.includes('permission-denied')) {
+            throw new Error("Database permission error. Please contact support.");
+        } else {
+            throw new Error(error.message || "Sign-in failed. Please try again.");
+        }
     }
 };
 
@@ -256,20 +273,41 @@ export const setMainTeacher = async (userEmail: string): Promise<void> => {
 
 // Study Materials CRUD Operations
 export const addStudyMaterial = async (material: Omit<StudyMaterial, 'id' | 'createdAt'>): Promise<string> => {
-    if (!isFirebaseConfigured || !db) throw new Error(CONFIG_ERROR_MESSAGE);
+    if (!isFirebaseConfigured || !db) {
+        console.error('Firebase not configured:', { isFirebaseConfigured, db: !!db });
+        throw new Error(CONFIG_ERROR_MESSAGE);
+    }
     
-    const docRef = await db.collection('studyMaterials').add({
-        ...material,
-        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-    });
-    
-    return docRef.id;
+    try {
+        console.log('Attempting to add study material to Firestore:', material);
+        
+        // Filter out undefined values to prevent Firestore errors
+        const cleanMaterial = Object.fromEntries(
+            Object.entries(material).filter(([_, value]) => value !== undefined)
+        );
+        
+        const docRef = await db.collection('studyMaterials').add({
+            ...cleanMaterial,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        });
+        
+        console.log('Study material added successfully with ID:', docRef.id);
+        return docRef.id;
+    } catch (error) {
+        console.error('Firestore error details:', error);
+        throw new Error(`Failed to add study material: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
 };
 
 export const updateStudyMaterial = async (id: string, updates: Partial<StudyMaterial>): Promise<void> => {
     if (!isFirebaseConfigured || !db) throw new Error(CONFIG_ERROR_MESSAGE);
     
-    await db.collection('studyMaterials').doc(id).update(updates);
+    // Filter out undefined values to prevent Firestore errors
+    const cleanUpdates = Object.fromEntries(
+        Object.entries(updates).filter(([_, value]) => value !== undefined)
+    );
+    
+    await db.collection('studyMaterials').doc(id).update(cleanUpdates);
 };
 
 export const deleteStudyMaterial = async (id: string): Promise<void> => {

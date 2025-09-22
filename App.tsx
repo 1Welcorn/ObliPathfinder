@@ -207,10 +207,15 @@ const App: React.FC = () => {
     // Study Materials Handlers
     const handleAddStudyMaterial = async (material: Omit<StudyMaterial, 'id' | 'createdAt'>) => {
         try {
-            await addStudyMaterial(material);
+            console.log('Adding study material:', material);
+            const materialId = await addStudyMaterial(material);
+            console.log('Study material added successfully with ID:', materialId);
+            alert('Study material saved successfully!');
+            // The subscription will automatically update the UI
         } catch (error) {
             console.error('Error adding study material:', error);
-            alert('Error adding study material. Please try again.');
+            alert(`Error adding study material: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            throw error; // Re-throw to let the modal handle it
         }
     };
 
@@ -306,13 +311,12 @@ const App: React.FC = () => {
                 currentUser={user}
             />;
             case 'study_materials_view':
-                 return <StudyMaterialsView 
+                return <StudyMaterialsView 
                     studyMaterials={studyMaterials}
                     onBack={() => setView('student_dashboard')}
                     isPortugueseHelpVisible={isPortugueseHelpVisible}
-                    onOpenOBLIAI={() => setView('obli_ai')}
                     currentUser={user}
-                 />;
+                />;
             case 'obli_ai':
                 return <OBLIAI
                     onBack={() => setView('study_materials_view')}

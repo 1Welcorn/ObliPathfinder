@@ -103,6 +103,7 @@ class SSHGeminiService {
             id: `session_${Date.now()}`,
             userId,
             subject,
+            difficulty: 'intermediate',
             messages: [],
             startTime: new Date(),
             topics: []

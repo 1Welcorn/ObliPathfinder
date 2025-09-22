@@ -143,6 +143,19 @@ export const suggestGoal = async (gradeLevel: string): Promise<string> => {
     }
 };
 
+export const generateContent = async (prompt: string): Promise<string> => {
+    try {
+        const response = await getAiInstance().models.generateContent({
+            model,
+            contents: prompt,
+        });
+        return response.text.trim();
+    } catch (error) {
+        console.error("Error generating content:", error);
+        throw new Error("Failed to generate content. The AI service may be unavailable.");
+    }
+};
+
 export const generatePracticeFeedback = async (practicePrompt: string, studentAnswer: string, gradeLevel: string): Promise<string> => {
     const gradeLabel = gradeLevelMap[gradeLevel] || 'default level';
     const prompt = `

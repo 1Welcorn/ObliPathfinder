@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "rm -rf node_modules package-lock.json && npm install && tsc -b && vite build",
+    "build": "vite build",
+    "build:fast": "vite build --mode development",
+    "build:prod": "tsc -b && vite build --mode production",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -27,10 +29,5 @@
     "tailwindcss": "^4.1.13",
     "typescript": "~5.8.2",
     "vite": "^6.2.0"
-  },
-  "overrides": {
-    "vite": {
-      "rollup": "npm:@rollup/wasm-node"
-    }
   }
 }

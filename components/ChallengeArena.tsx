@@ -4,7 +4,7 @@ import { TrophyIcon } from './icons/TrophyIcon';
 import { SparklesIcon } from './icons/SparklesIcon';
 import { TrendingUpIcon } from './icons/TrendingUpIcon';
 import { CheckCircleIcon } from './icons/CheckCircleIcon';
-import { XCircleIcon } from './icons/XCircleIcon';
+import XCircleIcon from './icons/XCircleIcon';
 import { ClockIcon } from './icons/ClockIcon';
 import { LightBulbIcon } from './icons/LightBulbIcon';
 import { SendIcon } from './icons/SendIcon';

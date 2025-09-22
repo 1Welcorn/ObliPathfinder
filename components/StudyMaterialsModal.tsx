@@ -113,30 +113,82 @@ const StudyMaterialsModal: React.FC<StudyMaterialsModalProps> = ({
         setEditingId(null);
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const validateForm = () => {
+        // Check required fields
+        if (!formData.title.trim()) {
+            alert('Title is required');
+            return false;
+        }
+        
+        if (!formData.description.trim()) {
+            alert('Description is required');
+            return false;
+        }
+        
+        // Check URL validation for link type
+        if (formData.type === 'link') {
+            if (!formData.url.trim()) {
+                alert('URL is required for link type materials');
+                return false;
+            }
+            
+            // Basic URL validation
+            try {
+                new URL(formData.url);
+            } catch {
+                alert('Please enter a valid URL (e.g., https://example.com)');
+                return false;
+            }
+        }
+        
+        return true;
+    };
+
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         
-        const materialData = {
-            title: formData.title,
-            description: formData.description,
+        if (!validateForm()) {
+            return;
+        }
+        
+        const materialData: any = {
+            title: formData.title.trim(),
+            description: formData.description.trim(),
             type: formData.type,
-            url: formData.url || undefined,
-            content: formData.content || undefined,
-            dueDate: formData.dueDate ? new Date(formData.dueDate) : undefined,
-            points: formData.points ? parseInt(formData.points) : undefined,
             isRequired: formData.isRequired,
             createdBy: currentUserEmail || 'unknown',
             tags: formData.tags.split(',').map(tag => tag.trim()).filter(tag => tag),
             level: formData.level
         };
 
-        if (editingId) {
-            onUpdateMaterial(editingId, materialData);
-        } else {
-            onAddMaterial(materialData);
+        // Only add optional fields if they have values
+        if (formData.url.trim()) {
+            materialData.url = formData.url.trim();
         }
-        
-        resetForm();
+        if (formData.content.trim()) {
+            materialData.content = formData.content.trim();
+        }
+        if (formData.dueDate) {
+            materialData.dueDate = new Date(formData.dueDate);
+        }
+        if (formData.points) {
+            materialData.points = parseInt(formData.points);
+        }
+
+        try {
+            if (editingId) {
+                await onUpdateMaterial(editingId, materialData);
+            } else {
+                await onAddMaterial(materialData);
+            }
+            
+            resetForm();
+            // Success message will be shown by the parent component
+        } catch (error) {
+            console.error('Error saving material:', error);
+            // Error message is already shown by the parent component
+            // Don't show another alert here
+        }
     };
 
     const handleEdit = (material: StudyMaterial) => {
@@ -355,15 +407,53 @@ const StudyMaterialsModal: React.FC<StudyMaterialsModalProps> = ({
 
                                     <div>
                                         <label className="block text-sm font-medium text-slate-700 mb-1">
-                                            URL
+                                            URL {formData.type === 'link' && <span className="text-red-500">*</span>}
                                         </label>
                                         <input
                                             type="url"
                                             value={formData.url}
                                             onChange={(e) => setFormData({ ...formData, url: e.target.value })}
-                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                            className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent ${
+                                                formData.type === 'link' && formData.url 
+                                                    ? (() => {
+                                                        try {
+                                                            new URL(formData.url);
+                                                            return 'border-green-300 bg-green-50';
+                                                        } catch {
+                                                            return 'border-red-300 bg-red-50';
+                                                        }
+                                                    })()
+                                                    : 'border-slate-300'
+                                            }`}
                                             placeholder="https://example.com"
+                                            required={formData.type === 'link'}
                                         />
+                                        {formData.type === 'link' && !formData.url && (
+                                            <p className="text-xs text-red-500 mt-1">
+                                                URL is required for link type materials
+                                            </p>
+                                        )}
+                                        {formData.type === 'link' && formData.url && (() => {
+                                            try {
+                                                new URL(formData.url);
+                                                return (
+                                                    <p className="text-xs text-green-600 mt-1">
+                                                        ✓ Valid URL format
+                                                    </p>
+                                                );
+                                            } catch {
+                                                return (
+                                                    <p className="text-xs text-red-500 mt-1">
+                                                        ✗ Invalid URL format. Please include http:// or https://
+                                                    </p>
+                                                );
+                                            }
+                                        })()}
+                                        {isPortugueseHelpVisible && (
+                                            <p className="text-xs text-slate-500 italic mt-1">
+                                                Para materiais do tipo "Link", a URL é obrigatória
+                                            </p>
+                                        )}
                                     </div>
 
                                     <div>
